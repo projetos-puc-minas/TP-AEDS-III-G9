@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 
 import src.util.Registro;
+import src.util.SerializadorUtil;
 
 public class Editora implements Registro{
     private int id;
@@ -24,9 +25,7 @@ public class Editora implements Registro{
     }
 
     public Editora(String nome, String cidade, int ano_fundacao){
-        this.nome = nome;
-        this.cidade = cidade;
-        this.ano_fundacao = ano_fundacao;
+        this(-1, nome, cidade, ano_fundacao);
     }
 
     public Editora(int id, String nome, String cidade, int ano_fundacao){
@@ -73,7 +72,7 @@ public class Editora implements Registro{
         this.cidade = cidade;
     }
 
-    public String getCidade(String cidade){
+    public String getCidade(){
         return this.cidade;
     }
 
@@ -90,8 +89,8 @@ public class Editora implements Registro{
         DataOutputStream dos = new DataOutputStream(baos);
 
         dos.writeInt(this.id);
-        dos.writeUTF(this.nome);
-        dos.writeUTF(this.cidade);
+        SerializadorUtil.writeString(dos, nome);
+        SerializadorUtil.writeString(dos, cidade);
         dos.writeInt(this.ano_fundacao);
 
         return baos.toByteArray();
@@ -102,8 +101,8 @@ public class Editora implements Registro{
         DataInputStream dis = new DataInputStream(bais);
 
         this.id = dis.readInt();
-        this.nome = dis.readUTF();
-        this.cidade = dis.readUTF();
+        this.nome = SerializadorUtil.readString(dis);
+        this.cidade = SerializadorUtil.readString(dis);
         this.ano_fundacao = dis.readInt();
     }
 

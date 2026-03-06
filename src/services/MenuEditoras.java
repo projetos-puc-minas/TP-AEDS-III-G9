@@ -83,6 +83,7 @@ public class MenuEditoras {
 
         System.out.print("Ano de Fundação: ");
         int ano_fundacao = console.nextInt();
+        console.nextLine();
 
         try {
             Editora editora = new Editora(nome, cidade, ano_fundacao);
