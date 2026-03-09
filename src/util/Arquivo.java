@@ -242,6 +242,33 @@ public class Arquivo<T extends Registro> {
         return NULO;
     }
 
+    // --- listagem ---
+
+    public java.util.List<T> listarTodos() throws Exception {
+        java.util.List<T> lista = new java.util.ArrayList<>();
+        arquivo.seek(TAM_CABECALHO);
+
+        while (arquivo.getFilePointer() < arquivo.length()) {
+            boolean lapide = arquivo.readBoolean();
+            int tamanho = arquivo.readInt();
+            byte[] dados = new byte[tamanho];
+
+            arquivo.readFully(dados);
+
+            if (lapide == LAPIDE_ATIVO) {
+                T obj = construtor.newInstance();
+
+                obj.fromByteArray(dados);
+                obj.setLapide(true);
+                obj.setTamRegistro(tamanho);
+                
+                lista.add(obj);
+            }
+        }
+
+        return lista;
+    }
+
     // --- fechamento ---
 
     public void close() throws Exception {
