@@ -1,0 +1,15 @@
+C:\Users\campa\Documents\TP-AEDS-III-G9\Main.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\dao\EditoraDAO.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\dao\LivroDAO.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\dao\TagLivroDAO.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\model\Editora.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\model\Livro.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\model\TagLivro.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\services\MenuEditoras.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\services\MenuLivros.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\services\ServidorAPI.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\util\Arquivo.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\util\ArvoreBMais_String_Int.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\util\HashExtensivel.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\util\Registro.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\util\SerializadorUtil.java
