@@ -1,5 +1,11 @@
 package src.model;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
 public class Autores {
     // Controle
     boolean lapide; // true = ativo ; false = excluído
@@ -70,5 +76,28 @@ public class Autores {
         return this.biografia;
     }
 
+    public byte[] toByteArray() throws IOException
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        dos.writeInt(id);
+        dos.writeUTF(nome);
+        dos.writeLong(dataNascimento);
+        dos.writeUTF(biografia);
+        
+        return baos.toByteArray();
+    }
+    
+    public void fromByteArray(byte[] ba) throws IOException
+    {
+        ByteArrayInputStream bais = new ByteArrayInputStream(ba);
+        DataInputStream dis = new DataInputStream(bais);
+
+        this.id = dis.readInt();
+        this.nome = dis.readUTF();
+        this.dataNascimento = dis.readLong();
+        this.biografia = dis.readUTF();
+    }
 
 }
