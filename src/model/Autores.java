@@ -5,8 +5,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.time.Instant;
 
-public class Autores {
+public class Autores implements Registro {
     // Controle
     boolean lapide; // true = ativo ; false = excluído
     int tamRegistro;
@@ -16,6 +17,10 @@ public class Autores {
     String nome;
     long dataNascimento;
     String biografia;
+
+    public Autores() {
+        this(-1, "", "", Instant.now().getEpochSecond(), "");
+    }
 
     public Autores(int id, String nome, long dataNasciento, String biografia) {
         this.id = id;
@@ -100,4 +105,11 @@ public class Autores {
         this.biografia = dis.readUTF();
     }
 
+    @Override
+    public String toString() {
+        return "\nID................: " + this.id +
+               "\nNome..............: " + this.nome +
+               "\nData de Nascimento: " + (this.dataNascimento).toString() +
+               "\nBiografia.........: " + this.biografia;
+    }
 }
