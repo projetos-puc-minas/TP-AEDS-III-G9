@@ -4,28 +4,39 @@ import java.util.List;
 import java.util.stream.Collectors;
 import src.model.LivroAutor;
 import src.util.Arquivo;
+import src.util.Indexador;
 
 public class LivroAutorDAO {
 
     private final Arquivo<LivroAutor> arqLivrosAutores;
+    private final Indexador indice;
 
-    public LivroAutorDAO() throws Exception {
-        arqLivrosAutores = new Arquivo<>("livros_autores", LivroAutor.class.getConstructor());
+    public LivroAutorDAO(Indexador indice) throws Exception {
+        this.arqLivrosAutores = new Arquivo<>("livros_autores", LivroAutor.class.getConstructor());
+        this.indice = indice;
     }
 
     // --- create ---
 
-    // vincula um único par livro-autor
     public boolean vincularAutorAoLivro(int idLivro, int idAutor) throws Exception {
-        return arqLivrosAutores.create(new LivroAutor(idLivro, idAutor)) > 0;
+        LivroAutor la = new LivroAutor(idLivro, idAutor);
+        
+        int id = arqLivrosAutores.create(la);
+        if (id > 0) {
+            indice.inserir(id, indice.buscar(id));
+        }
+
+        return id > 0;
     }
 
     // vincula múltiplos autores a um mesmo livro (N:N — um livro tem muitos autores)
     public int vincularAutoresAoLivro(int idLivro, int[] idsAutores) throws Exception {
         int vinculados = 0;
-        
+
         for (int idAutor : idsAutores) {
-            if (arqLivrosAutores.create(new LivroAutor(idLivro, idAutor)) > 0) vinculados++;
+            if (vincularAutorAoLivro(idLivro, idAutor)) {
+                vinculados++;
+            }
         }
 
         return vinculados;
@@ -36,19 +47,24 @@ public class LivroAutorDAO {
         int vinculados = 0;
 
         for (int idLivro : idsLivros) {
-            if (arqLivrosAutores.create(new LivroAutor(idLivro, idAutor)) > 0) vinculados++;
+            if (vincularAutorAoLivro(idLivro, idAutor)) {
+                vinculados++;
+            }
         }
 
         return vinculados;
     }
 
-    // --- fead ---
+    // --- read ---
 
     public LivroAutor buscarPorId(int id) throws Exception {
+        if (indice.buscar(id) < 0) {
+            return null;
+        }
         return arqLivrosAutores.read(id);
     }
 
-    // fetorna todos os registros de vínculo de um livro (todos os autores do livro)
+    // retorna todos os registros de vínculo de um livro (todos os autores do livro)
     public List<LivroAutor> buscarAutoresDoLivro(int idLivro) throws Exception {
         return arqLivrosAutores.listarTodos()
                 .stream()
@@ -56,7 +72,7 @@ public class LivroAutorDAO {
                 .collect(Collectors.toList());
     }
 
-    // fetorna todos os registros de vínculo de um autor (todos os livros do autor)
+    // retorna todos os registros de vínculo de um autor (todos os livros do autor)
     public List<LivroAutor> buscarLivrosDoAutor(int idAutor) throws Exception {
         return arqLivrosAutores.listarTodos()
                 .stream()
@@ -64,7 +80,7 @@ public class LivroAutorDAO {
                 .collect(Collectors.toList());
     }
 
-    // fetorna apenas os IDs dos autores de um livro
+    // retorna apenas os IDs dos autores de um livro
     public int[] buscarIdsAutoresDoLivro(int idLivro) throws Exception {
         return buscarAutoresDoLivro(idLivro)
                 .stream()
@@ -72,7 +88,7 @@ public class LivroAutorDAO {
                 .toArray();
     }
 
-    // fetorna apenas os IDs dos livros de um autor
+    // retorna apenas os IDs dos livros de um autor
     public int[] buscarIdsLivrosDoAutor(int idAutor) throws Exception {
         return buscarLivrosDoAutor(idAutor)
                 .stream()
@@ -87,22 +103,37 @@ public class LivroAutorDAO {
     // --- update ---
 
     public boolean alterarLivroAutor(LivroAutor livroAutor) throws Exception {
-        return arqLivrosAutores.update(livroAutor);
+        boolean ok = arqLivrosAutores.update(livroAutor);
+
+        if (ok) {
+            indice.atualizar(livroAutor.getId(), indice.buscar(livroAutor.getId()));
+        }
+
+        return ok;
     }
 
     // --- delete ---
 
     public boolean excluirPorId(int id) throws Exception {
-        return arqLivrosAutores.delete(id);
+        boolean ok = arqLivrosAutores.delete(id);
+
+        if (ok) {
+            indice.remover(id);
+        }
+
+        return ok;
     }
 
     // remove todos os vínculos de um livro (ex: ao excluir o livro)
     public int excluirAutoresDoLivro(int idLivro) throws Exception {
         List<LivroAutor> registros = buscarAutoresDoLivro(idLivro);
+
         int removidos = 0;
 
         for (LivroAutor la : registros) {
-            if (arqLivrosAutores.delete(la.getId())) removidos++;
+            if (excluirPorId(la.getId())) {
+                removidos++;
+            }
         }
 
         return removidos;
@@ -111,10 +142,13 @@ public class LivroAutorDAO {
     // remove todos os vínculos de um autor (ex: ao excluir o autor)
     public int excluirLivrosDoAutor(int idAutor) throws Exception {
         List<LivroAutor> registros = buscarLivrosDoAutor(idAutor);
+
         int removidos = 0;
-        
+
         for (LivroAutor la : registros) {
-            if (arqLivrosAutores.delete(la.getId())) removidos++;
+            if (excluirPorId(la.getId())) {
+                removidos++;
+            }
         }
 
         return removidos;

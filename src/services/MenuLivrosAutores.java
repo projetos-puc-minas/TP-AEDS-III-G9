@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Scanner;
 import src.dao.LivroAutorDAO;
 import src.model.LivroAutor;
+import src.util.ArvoreBMais;
+import src.util.Indexador;
 
 public class MenuLivrosAutores {
 
@@ -11,7 +13,8 @@ public class MenuLivrosAutores {
     private final Scanner console = new Scanner(System.in);
 
     public MenuLivrosAutores() throws Exception {
-        livroAutorDAO = new LivroAutorDAO();
+        Indexador indice = new ArvoreBMais("livros_autores");
+        livroAutorDAO = new LivroAutorDAO(indice);
     }
 
     public void menu() {
@@ -54,6 +57,7 @@ public class MenuLivrosAutores {
     }
 
     // --- listar autores de um livro (N:N: um livro tem muitos autores) ---
+
     private void listarAutoresDoLivro() {
         System.out.print("\nID do Livro: ");
         int idLivro = lerInt();
@@ -71,7 +75,8 @@ public class MenuLivrosAutores {
         }
     }
 
-    // --- listar livros de um autor (N:N: um autor tem muitos livros) ---
+    // --- listar livros de um autor (N:N: um autor tem muitos livros) ---0,
+
     private void listarLivrosDoAutor() {
         System.out.print("\nID do Autor: ");
         int idAutor = lerInt();
@@ -90,6 +95,7 @@ public class MenuLivrosAutores {
     }
 
     // --- listar todos ---
+
     private void listarTodos() {
         try {
             List<LivroAutor> lista = livroAutorDAO.listarTodos();
@@ -105,6 +111,7 @@ public class MenuLivrosAutores {
     }
 
     // --- vincular múltiplos autores a um livro (N:N) ---
+
     private void vincularAutoresAoLivro() {
         System.out.println("\nVincular autores a um livro");
 
@@ -134,6 +141,7 @@ public class MenuLivrosAutores {
     }
 
     // --- vincular múltiplos livros a um autor (N:N) ---
+
     private void vincularLivrosAoAutor() {
         System.out.println("\nVincular livros a um autor");
 
@@ -163,6 +171,7 @@ public class MenuLivrosAutores {
     }
 
     // --- alterar vínculo por ID ---
+
     private void alterarVinculo() {
         System.out.print("\nID do vínculo a ser alterado: ");
         int id = lerInt();
@@ -197,6 +206,7 @@ public class MenuLivrosAutores {
     }
 
     // --- excluir vínculo por ID ---
+
     private void excluirPorId() {
         System.out.print("\nID do vínculo a ser excluído: ");
         int id = lerInt();
@@ -225,6 +235,7 @@ public class MenuLivrosAutores {
     }
 
     // --- excluir todos os autores de um livro ---
+
     private void excluirAutoresDoLivro() {
         System.out.print("\nID do Livro: ");
         int idLivro = lerInt();
@@ -252,6 +263,7 @@ public class MenuLivrosAutores {
     }
 
     // --- excluir todos os livros de um autor ---
+
     private void excluirLivrosDoAutor() {
         System.out.print("\nID do Autor: ");
         int idAutor = lerInt();
@@ -279,6 +291,7 @@ public class MenuLivrosAutores {
     }
 
     // --- utilitário ---
+    
     private int lerInt() {
         try {
             return Integer.parseInt(console.nextLine().trim());
