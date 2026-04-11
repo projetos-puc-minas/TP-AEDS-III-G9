@@ -1,6 +1,6 @@
 import java.util.Scanner;
-
 import src.services.MenuEditoras;
+import src.services.MenuLivrosAutores;
 
 public class Main {
     public static void main(String[] args){
@@ -13,12 +13,13 @@ public class Main {
                 System.out.println("-------");
                 System.out.println("> Início");
                 System.out.println("\n1 - Editoras");
+                System.out.println("2 - Livros-Autores");
                 System.out.println("0 - Sair");
 
                 System.out.print("\nOpção: ");
                 try {
                     opcao = Integer.valueOf(console.nextLine());
-                }catch(NumberFormatException e) {
+                } catch(NumberFormatException e) {
                     opcao = -1;
                 }
 
@@ -27,6 +28,10 @@ public class Main {
                         MenuEditoras menuEditoras = new MenuEditoras();
                         menuEditoras.menu();
                         break;
+                    case 2:
+                        MenuLivrosAutores menuLivrosAutores = new MenuLivrosAutores();
+                        menuLivrosAutores.menu();
+                        break;
                     case 0:
                         System.out.println("Saindo...");
                         break;
@@ -34,14 +39,13 @@ public class Main {
                         System.out.println("Opção inválida!");
                         break;
                 }
-            }while(opcao != 0);
+            } while(opcao != 0);
 
-        }catch(Exception e){
+        } catch(Exception e){
             System.err.println("Erro fatal no sistema");
             e.printStackTrace();
-        }finally{
+        } finally{
             console.close();
         }
     }
-    
 }
