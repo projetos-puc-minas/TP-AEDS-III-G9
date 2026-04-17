@@ -10,9 +10,9 @@ public interface Indexador {
 
     boolean atualizar(int chave, long novoEndereco) throws Exception;
 
-    long[][] listarOrdenado() throws Exception;
+    //long[][] listarOrdenado() throws Exception;
 
-    long getTotalChaves() throws Exception;
+    //long getTotalChaves() throws Exception;
 
     void close() throws Exception;
 }

@@ -4,13 +4,17 @@ import java.util.Scanner;
 
 import src.dao.EditoraDAO;
 import src.model.Editora;
+import src.util.HashExtensivel;
+import src.util.Indexador;
 
 public class MenuEditoras {
     private EditoraDAO editoraDAO;
+    private Indexador indice;
     private Scanner console = new Scanner(System.in);
 
     public MenuEditoras() throws Exception{
-        editoraDAO = new EditoraDAO();
+        this.indice = new HashExtensivel("editoras");
+        editoraDAO = new EditoraDAO(this.indice);
     }
 
     public void menu(){

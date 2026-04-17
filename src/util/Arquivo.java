@@ -39,7 +39,7 @@ public class Arquivo<T extends Registro> {
 
     // --- crud ---
 
-    public int create(T obj) throws Exception {
+    public int create(T obj, Indexador indice) throws Exception {
         arquivo.seek(OFFSET_ULTIMO_ID);
         int novoID = arquivo.readInt() + 1;
         arquivo.seek(OFFSET_ULTIMO_ID);
@@ -53,7 +53,8 @@ public class Arquivo<T extends Registro> {
         long endereco = getDeleted(tamanho);
 
         if (endereco == NULO) {
-            arquivo.seek(arquivo.length());
+            endereco = arquivo.length();
+            arquivo.seek(endereco);
             arquivo.writeBoolean(LAPIDE_ATIVO);
             arquivo.writeInt(tamanho);
             arquivo.write(dados);
@@ -66,10 +67,29 @@ public class Arquivo<T extends Registro> {
 
         obj.setLapide(true);
         obj.setTamRegistro(tamanho);
+        indice.inserir(novoID, endereco);
         return novoID;
     }
 
-    public T read(int id) throws Exception {
+    public T read(int id, Indexador indice) throws Exception {
+        long endereco = indice.buscar(id);
+        if(endereco == NULO)return null;
+
+        this.arquivo.seek(endereco);
+        boolean lapide = this.arquivo.readBoolean();
+        int tamanho = this.arquivo.readInt();
+
+        if(lapide){
+            byte[] dado = new byte[tamanho];
+            this.arquivo.readFully(dado);
+            T obj = this.construtor.newInstance();
+            obj.fromByteArray(dado);
+            return obj;
+        }
+
+        return null;
+        /*
+        //versão antiga sem o hash
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -89,9 +109,30 @@ public class Arquivo<T extends Registro> {
             }
         }
         return null;
+        */
     }
 
-    public boolean delete(int id) throws Exception {
+    public boolean delete(int id, Indexador indice) throws Exception {
+        long endereco = indice.buscar(id);
+        if(endereco == NULO)return false;
+
+        this.arquivo.seek(endereco);
+        boolean lapide = this.arquivo.readBoolean();
+        int tamanho = this.arquivo.readInt();
+
+        if(lapide){
+            this.arquivo.seek(endereco);
+            this.arquivo.writeBoolean(LAPIDE_EXCLUIDO);
+            indice.remover(id);
+            incrementaTotalRegistros(-1);
+            addDeleted(tamanho, endereco);
+            return true;
+        }
+
+        return false;
+
+        /*
+        versão antiga sem o hash
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -114,9 +155,39 @@ public class Arquivo<T extends Registro> {
             }
         }
         return false;
+        */
     }
 
-    public boolean update(T novoObj) throws Exception {
+    public boolean update(T novoObj, Indexador indice) throws Exception {
+        long enderecoAntigo = indice.buscar(novoObj.getId());
+        if(enderecoAntigo == NULO)return false;
+
+        this.arquivo.seek(enderecoAntigo + 1);
+        int tamanhoAtual = this.arquivo.readInt();
+        byte[] novosDados = novoObj.toByteArray();
+        int novoTamanho = novosDados.length;
+
+        if(novoTamanho == tamanhoAtual){
+            this.arquivo.write(novosDados);
+        }else{
+            this.arquivo.seek(enderecoAntigo);
+            this.arquivo.writeBoolean(LAPIDE_EXCLUIDO);
+            addDeleted(tamanhoAtual, enderecoAntigo);
+
+            long novoEndereco = getDeleted(novoTamanho);
+            if(novoTamanho == NULO)novoEndereco = this.arquivo.length();
+
+            this.arquivo.seek(novoEndereco);
+            this.arquivo.writeBoolean(LAPIDE_ATIVO);
+            this.arquivo.writeInt(novoTamanho);
+            this.arquivo.write(novosDados);
+
+            indice.atualizar(novoObj.getId(), novoEndereco);
+        }
+
+        return true;
+        /* 
+        versão antiga sem o hash
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -164,6 +235,7 @@ public class Arquivo<T extends Registro> {
             }
         }
         return false;
+        */
     }
 
     // --- cabeçalho ---
