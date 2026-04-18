@@ -94,7 +94,7 @@ public class ArvoreBMais implements Indexador {
         return atualizarNaFolha(raiz, chave, novoEndereco);
     }
 
-    @Override
+    //@Override
     public long[][] listarOrdenado() throws Exception {
         long raiz = getRaiz();
 
@@ -124,7 +124,7 @@ public class ArvoreBMais implements Indexador {
         return lista.toArray(new long[0][0]);
     }
 
-    @Override
+    //@Override
     public long getTotalChaves() throws Exception {
         idx.seek(OFFSET_TOTAL);
         return idx.readLong();
