@@ -1,6 +1,6 @@
 package src.util;
 
-public interface Indexador {
+public interface Indexador{
 
     void inserir(int chave, long endereco) throws Exception;
 
