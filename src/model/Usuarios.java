@@ -36,34 +36,6 @@ public class Usuarios implements Registro
         this.senhaXor = "";
     }
 
-    //codigo da criptografia pro futuro, perguntar pro walisson se e assim que ele quer msm
-    /*//gera chave de bytes aleatorios
-    public static byte[] gererChaves(int tamanho)
-    {
-        SecureRandom geradorSeguro = new SecureRandom();
-
-        byte[] chave = new byte[tamanho];
-
-        geradorSeguro.nextBytes(chave);//preenche o array com bytes aleatorios
-
-        return chave;
-    }
-
-    //criptografa a senha usando xor com bytes
-    public byte[] XorCriptografia(byte[] texto, byte[] chave)
-    {
-        byte[] resultado = new byte[texto.length];
-
-        for(int i = 0; i < texto.length; i++)
-        {
-            //XOR entre o byte do texto e o byte da chave
-            resultado[i] = (byte) (texto[i] ^ chave[i % chave.length]);
-        }
-
-        return resultado;
-    }*/
-
-
     //setters
     public void setLapide(boolean Lapide)
     {

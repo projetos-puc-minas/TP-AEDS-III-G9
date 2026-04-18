@@ -171,6 +171,7 @@ public class UsuarioService
             System.out.println("Erro ao excluir usuário.");
         }
     }
+    
     /*public int cadastrar(String nome, String email, String senha) throws Exception
     {
         // Validação simples de nome e email
