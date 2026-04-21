@@ -14,11 +14,13 @@ public class Main {
                 System.out.println("> Início");
                 System.out.println("\n1 - Editoras");
                 System.out.println("2 - Livros-Autores");
+                System.out.println("3 - Tags");
+                System.out.println("4 - Tags-Livros");
                 System.out.println("0 - Sair");
 
                 System.out.print("\nOpção: ");
                 try {
-                    opcao = Integer.valueOf(console.nextLine());
+                    opcao = Integer.parseInt(console.nextLine());
                 } catch(NumberFormatException e) {
                     opcao = -1;
                 }
