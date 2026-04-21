@@ -2,7 +2,8 @@ package src.util;
 
 import java.io.IOException;
 
-public interface Registro {
+public interface Registro
+{
 
     // --- armazenamento ---
 

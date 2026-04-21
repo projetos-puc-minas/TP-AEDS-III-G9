@@ -39,7 +39,8 @@ public class Arquivo<T extends Registro> {
 
     // --- crud ---
 
-    public int create(T obj, Indexador indice) throws Exception {
+    public int create(T obj, Indexador indice) throws Exception
+    {
         arquivo.seek(OFFSET_ULTIMO_ID);
         int novoID = arquivo.readInt() + 1;
         arquivo.seek(OFFSET_ULTIMO_ID);
@@ -52,7 +53,8 @@ public class Arquivo<T extends Registro> {
 
         long endereco = getDeleted(tamanho);
 
-        if (endereco == NULO) {
+        if (endereco == NULO)
+        {
             endereco = arquivo.length();
             arquivo.seek(endereco);
             arquivo.writeBoolean(LAPIDE_ATIVO);
@@ -90,6 +92,10 @@ public class Arquivo<T extends Registro> {
         return null;
         /*
         //versão antiga sem o hash
+        return novoID;
+    }
+
+    public T read(int id) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -133,6 +139,9 @@ public class Arquivo<T extends Registro> {
 
         /*
         versão antiga sem o hash
+    }
+
+    public boolean delete(int id) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -186,8 +195,12 @@ public class Arquivo<T extends Registro> {
         }
 
         return true;
+    
         /* 
-        versão antiga sem o hash
+        versão antiga sem o hash*/
+    }
+
+    public boolean update(T novoObj) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
         while (arquivo.getFilePointer() < arquivo.length()) {
@@ -235,7 +248,6 @@ public class Arquivo<T extends Registro> {
             }
         }
         return false;
-        */
     }
 
     // --- cabeçalho ---
@@ -347,3 +359,4 @@ public class Arquivo<T extends Registro> {
         arquivo.close();
     }
 }
+
