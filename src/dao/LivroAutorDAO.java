@@ -20,12 +20,7 @@ public class LivroAutorDAO {
 
     public boolean vincularAutorAoLivro(int idLivro, int idAutor) throws Exception {
         LivroAutor la = new LivroAutor(idLivro, idAutor);
-        
-        int id = arqLivrosAutores.create(la);
-        if (id > 0) {
-            indice.inserir(id, indice.buscar(id));
-        }
-
+        int id = arqLivrosAutores.create(la, indice);
         return id > 0;
     }
 
@@ -61,7 +56,7 @@ public class LivroAutorDAO {
         if (indice.buscar(id) < 0) {
             return null;
         }
-        return arqLivrosAutores.read(id);
+        return arqLivrosAutores.read(id, indice);
     }
 
     // retorna todos os registros de vínculo de um livro (todos os autores do livro)
@@ -103,25 +98,13 @@ public class LivroAutorDAO {
     // --- update ---
 
     public boolean alterarLivroAutor(LivroAutor livroAutor) throws Exception {
-        boolean ok = arqLivrosAutores.update(livroAutor);
-
-        if (ok) {
-            indice.atualizar(livroAutor.getId(), indice.buscar(livroAutor.getId()));
-        }
-
-        return ok;
+        return arqLivrosAutores.update(livroAutor, indice);
     }
 
     // --- delete ---
 
     public boolean excluirPorId(int id) throws Exception {
-        boolean ok = arqLivrosAutores.delete(id);
-
-        if (ok) {
-            indice.remover(id);
-        }
-
-        return ok;
+        return arqLivrosAutores.delete(id, indice);
     }
 
     // remove todos os vínculos de um livro (ex: ao excluir o livro)
