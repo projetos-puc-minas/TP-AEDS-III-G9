@@ -1,20 +1,24 @@
-package src.service;
+package src.services;
 
 import java.util.Scanner;
 import src.dao.UsuarioDAO;
 import src.model.Usuarios;
+import src.util.HashExtensivel;
+import src.util.Indexador;
 
 public class UsuarioService
 {
     
     private UsuarioDAO usuarioDAO;
+    private Indexador indice;
 
     private Scanner console = new Scanner(System.in);
 
 
     public UsuarioService() throws Exception
     {
-        this.usuarioDAO = new UsuarioDAO();
+        this.indice = new HashExtensivel("usuarios");
+        this.usuarioDAO = new UsuarioDAO(this.indice);
     }
 
 
@@ -211,4 +215,3 @@ public class UsuarioService
         return usuarioDAO.excluirUsuario(id);
     }*/
 }
-

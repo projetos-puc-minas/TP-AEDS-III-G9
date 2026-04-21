@@ -1,7 +1,9 @@
 import java.util.Scanner;
-import src.service.UsuarioService;
 import src.services.MenuEditoras;
 import src.services.MenuLivrosAutores;
+import src.services.MenuTags;
+import src.services.MenuTagsLivros;
+import src.services.UsuarioService;
 
 public class Main {
 
@@ -18,6 +20,7 @@ public class Main {
                 System.out.println("2 - Livros-Autores");
                 System.out.println("3 - Tags");
                 System.out.println("4 - Tags-Livros");
+                System.out.println("5 - Usuários");
                 System.out.println("0 - Sair");
 
                 System.out.print("\nOpção: ");
@@ -38,6 +41,12 @@ public class Main {
                         new MenuLivrosAutores().menu();
                         break;
                     case 3:
+                        new MenuTags().menu();
+                        break;
+                    case 4:
+                        new MenuTagsLivros().menu();
+                        break;
+                    case 5:
                         new UsuarioService().menu();
                         break;
                     case 0:
