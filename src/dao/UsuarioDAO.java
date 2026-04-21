@@ -2,39 +2,41 @@ package src.dao;
 
 import src.model.Usuarios;
 import src.util.Arquivo;
+import src.util.Indexador;
 
 public class UsuarioDAO
 {
     private Arquivo<Usuarios> arqUsuarios;
+    private final Indexador indice;
 
-    public UsuarioDAO() throws  Exception
+    public UsuarioDAO(Indexador indice) throws Exception
     {
-       arqUsuarios = new Arquivo<>("usuarios", Usuarios.class.getConstructor());
-
+        arqUsuarios = new Arquivo<>("usuarios", Usuarios.class.getConstructor());
+        this.indice = indice;
     }
 
-    //CREAT
+    // CREATE
     public int incluirUsuario(Usuarios usuario) throws Exception
     {
-        return arqUsuarios.create(usuario);
+        return arqUsuarios.create(usuario, indice);
     }
 
-    //READ
+    // READ
     public Usuarios buscarUsuario(int id) throws Exception
     {
-        return arqUsuarios.read(id);
+        return arqUsuarios.read(id, indice);
     }
 
-    //UPDATE
+    // UPDATE
     public boolean alterarUsuario(Usuarios usuario) throws Exception
     {
-        return arqUsuarios.update(usuario);
+        return arqUsuarios.update(usuario, indice);
     }
 
-    //DELETE == desativa a lapide
+    // DELETE == desativa a lapide
     public boolean excluirUsuario(int id) throws Exception
     {
-        return arqUsuarios.delete(id);
+        return arqUsuarios.delete(id, indice);
     }
 
 }

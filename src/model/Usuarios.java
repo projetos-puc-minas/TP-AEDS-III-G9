@@ -7,8 +7,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import src.util.Registro;
 
-
-
 public class Usuarios implements Registro
 {
     boolean lapide;
@@ -36,10 +34,11 @@ public class Usuarios implements Registro
         this.senhaXor = "";
     }
 
-    //setters
+    // setters
+    @Override
     public void setLapide(boolean Lapide)
     {
-        this.lapide = lapide;
+        this.lapide = Lapide;
     }
 
     public void setNome(String nome)
@@ -47,6 +46,7 @@ public class Usuarios implements Registro
         this.nome = nome;
     }
 
+    @Override
     public void setId(int id)
     {
         this.id = id;
@@ -56,7 +56,8 @@ public class Usuarios implements Registro
     {
         this.email = email;
     }
-
+    
+    @Override
     public void setTamRegistro(int tamRegistros)
     {
         this.tamRegistro = tamRegistros;
@@ -67,10 +68,8 @@ public class Usuarios implements Registro
         this.senhaXor = senhaXor;
     }
 
-
-
-
-    //getters
+    // getters
+    @Override
     public boolean getLapide()
     {
         return this.lapide;
@@ -81,6 +80,7 @@ public class Usuarios implements Registro
         return this.nome;
     }
 
+    @Override
     public int getId()
     {
         return this.id;
@@ -91,6 +91,7 @@ public class Usuarios implements Registro
         return this.email;
     }
 
+    @Override
     public int getTamRegistro()
     {
         return this.tamRegistro;
@@ -101,7 +102,7 @@ public class Usuarios implements Registro
         return this.senhaXor;
     }
 
-
+    @Override
     public byte[] toByteArray() throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -115,6 +116,7 @@ public class Usuarios implements Registro
         return baos.toByteArray();
     }
     
+    @Override
     public void fromByteArray(byte[] ba) throws IOException
     {
         ByteArrayInputStream bais = new ByteArrayInputStream(ba);
