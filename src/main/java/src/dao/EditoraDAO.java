@@ -11,6 +11,7 @@ import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
+import src.util.OrdenacaoExterna;
 
 /**
  * DAO de Editoras.
@@ -118,6 +119,41 @@ public class EditoraDAO {
             }
             pares = indice.listarOrdenado();
         }
+        List<Editora> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Editora e = arqEditoras.readByOffset(par[1]);
+            if (e != null) res.add(e);
+        }
+        return res;
+    }
+
+    public List<Editora> listarOrdenadoDecrescentePorId() throws Exception {
+        long[][] pares = indice.listarOrdenadoDecrescente();
+        if (pares.length == 0 && arqEditoras.getTotalRegistros() > 0) {
+            for (Arquivo.OffsetEntry<Editora> e : arqEditoras.listarComOffset()) {
+                indice.inserir(e.objeto.getId(), e.offset);
+            }
+            pares = indice.listarOrdenadoDecrescente();
+        }
+        List<Editora> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Editora e = arqEditoras.readByOffset(par[1]);
+            if (e != null) res.add(e);
+        }
+        return res;
+    }
+
+    /**
+     * Ordenação externa por intercalação — ordena editoras pelo nome
+     * sem carregar todos os registros na RAM de uma vez.
+     */
+    public List<Editora> listarOrdenadoPorNome() throws Exception {
+        OrdenacaoExterna<Editora> ord = new OrdenacaoExterna<>(
+            arqEditoras,
+            Editora.class.getConstructor(),
+            (a, b) -> a.getNome().compareToIgnoreCase(b.getNome())
+        );
+        long[][] pares = ord.ordenar();
         List<Editora> res = new ArrayList<>();
         for (long[] par : pares) {
             Editora e = arqEditoras.readByOffset(par[1]);

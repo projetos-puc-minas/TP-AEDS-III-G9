@@ -11,6 +11,7 @@ import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
+import src.util.OrdenacaoExterna;
 
 /**
  * DAO de Autores.
@@ -116,6 +117,41 @@ public class AutoresDAO {
             }
             pares = indice.listarOrdenado();
         }
+        List<Autores> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Autores a = arqAutores.readByOffset(par[1]);
+            if (a != null) res.add(a);
+        }
+        return res;
+    }
+
+    public List<Autores> listarOrdenadoDecrescentePorId() throws Exception {
+        long[][] pares = indice.listarOrdenadoDecrescente();
+        if (pares.length == 0 && arqAutores.getTotalRegistros() > 0) {
+            for (Arquivo.OffsetEntry<Autores> e : arqAutores.listarComOffset()) {
+                indice.inserir(e.objeto.getId(), e.offset);
+            }
+            pares = indice.listarOrdenadoDecrescente();
+        }
+        List<Autores> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Autores a = arqAutores.readByOffset(par[1]);
+            if (a != null) res.add(a);
+        }
+        return res;
+    }
+
+    /**
+     * Ordenação externa por intercalação — ordena autores pelo nome
+     * sem carregar todos os registros na RAM de uma vez.
+     */
+    public List<Autores> listarOrdenadoPorNome() throws Exception {
+        OrdenacaoExterna<Autores> ord = new OrdenacaoExterna<>(
+            arqAutores,
+            Autores.class.getConstructor(),
+            (a, b) -> a.getNome().compareToIgnoreCase(b.getNome())
+        );
+        long[][] pares = ord.ordenar();
         List<Autores> res = new ArrayList<>();
         for (long[] par : pares) {
             Autores a = arqAutores.readByOffset(par[1]);

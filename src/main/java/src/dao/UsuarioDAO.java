@@ -3,6 +3,7 @@ package src.dao;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.List;
 
 import src.model.Usuarios;
@@ -10,6 +11,7 @@ import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
+import src.util.OrdenacaoExterna;
 
 /**
  * DAO de Utilizadores.
@@ -98,6 +100,61 @@ public class UsuarioDAO {
             hash.remover(id);
         }
         return ok;
+    }
+
+    // -------------------------------------------------------------------------
+    // LISTAGEM ORDENADA (via B+ e OrdenacaoExterna)
+    // -------------------------------------------------------------------------
+
+    public List<Usuarios> listarOrdenadoPorId() throws Exception {
+        long[][] pares = indice.listarOrdenado();
+        if (pares.length == 0 && arqUsuarios.getTotalRegistros() > 0) {
+            for (Arquivo.OffsetEntry<Usuarios> e : arqUsuarios.listarComOffset()) {
+                indice.inserir(e.objeto.getId(), e.offset);
+            }
+            pares = indice.listarOrdenado();
+        }
+        List<Usuarios> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Usuarios u = arqUsuarios.readByOffset(par[1]);
+            if (u != null) res.add(u);
+        }
+        return res;
+    }
+
+    public List<Usuarios> listarOrdenadoDecrescentePorId() throws Exception {
+        long[][] pares = indice.listarOrdenadoDecrescente();
+        if (pares.length == 0 && arqUsuarios.getTotalRegistros() > 0) {
+            for (Arquivo.OffsetEntry<Usuarios> e : arqUsuarios.listarComOffset()) {
+                indice.inserir(e.objeto.getId(), e.offset);
+            }
+            pares = indice.listarOrdenadoDecrescente();
+        }
+        List<Usuarios> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Usuarios u = arqUsuarios.readByOffset(par[1]);
+            if (u != null) res.add(u);
+        }
+        return res;
+    }
+
+    /**
+     * Ordenação externa por intercalação — ordena usuários pelo nome
+     * sem carregar todos os registros na RAM de uma vez.
+     */
+    public List<Usuarios> listarOrdenadoPorNome() throws Exception {
+        OrdenacaoExterna<Usuarios> ord = new OrdenacaoExterna<>(
+            arqUsuarios,
+            Usuarios.class.getConstructor(),
+            (a, b) -> a.getNome().compareToIgnoreCase(b.getNome())
+        );
+        long[][] pares = ord.ordenar();
+        List<Usuarios> res = new ArrayList<>();
+        for (long[] par : pares) {
+            Usuarios u = arqUsuarios.readByOffset(par[1]);
+            if (u != null) res.add(u);
+        }
+        return res;
     }
 
     // -------------------------------------------------------------------------

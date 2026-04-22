@@ -21,8 +21,8 @@ public class OrdenacaoExterna<T extends Registro> {
     // Número máximo de registros mantidos em RAM por vez durante a geração de runs
     private static final int TAM_BLOCO = 8;
 
-    private final Arquivo<T>    arquivo;
-    private final Comparator<T> comparador;
+    private final Arquivo<T>     arquivo;
+    private final Comparator<T>  comparador;
     private final Constructor<T> construtor;
 
     /**
@@ -31,9 +31,9 @@ public class OrdenacaoExterna<T extends Registro> {
      * @param comparador define o atributo de ordenação (ex: por id, titulo, ano)
      */
     public OrdenacaoExterna(Arquivo<T> arquivo, Constructor<T> construtor, Comparator<T> comparador) {
-        this.arquivo     = arquivo;
-        this.construtor  = construtor;
-        this.comparador  = comparador;
+        this.arquivo    = arquivo;
+        this.construtor = construtor;
+        this.comparador = comparador;
     }
 
     /**
@@ -69,7 +69,7 @@ public class OrdenacaoExterna<T extends Registro> {
             int fim = Math.min(i + TAM_BLOCO, todos.size());
             List<Arquivo.OffsetEntry<T>> bloco = new ArrayList<>(todos.subList(i, fim));
 
-            // Ordena o bloco em memória
+            // Ordena o bloco em memória usando o comparador fornecido
             bloco.sort((a, b) -> comparador.compare(a.objeto, b.objeto));
 
             File tmp = File.createTempFile("bibliosys_run_", ".tmp");
@@ -79,8 +79,8 @@ public class OrdenacaoExterna<T extends Registro> {
                     new BufferedOutputStream(new FileOutputStream(tmp)))) {
                 dos.writeInt(bloco.size());
                 for (Arquivo.OffsetEntry<T> entry : bloco) {
-                    dos.writeInt(entry.objeto.getId());   // chave
-                    dos.writeLong(entry.offset);           // offset no .bin
+                    dos.writeInt(entry.objeto.getId()); // chave
+                    dos.writeLong(entry.offset);         // offset no .bin
                 }
             }
 
@@ -118,7 +118,11 @@ public class OrdenacaoExterna<T extends Registro> {
 
     /**
      * Intercala dois runs ordenados em um único run ordenado.
-     * Lê um par de cada vez de cada run — sem carregar tudo na memória.
+     *
+     * CORREÇÃO: a comparação usa o mesmo comparador da 1ª passagem,
+     * relendo os objetos do arquivo principal pelo offset armazenado no run.
+     * Isso garante que a ordem do run final respeite o atributo de ordenação
+     * (título, nome, etc.) e não apenas o ID.
      */
     private File intercalarDois(File runA, File runB) throws Exception {
         File saida = File.createTempFile("bibliosys_merge_", ".tmp");
@@ -132,15 +136,23 @@ public class OrdenacaoExterna<T extends Registro> {
             int tamB = disB.readInt();
             dos.writeInt(tamA + tamB); // tamanho do run resultante
 
-            // Lê o primeiro par de cada run
-            int[]  idA     = new int[1];  long[] offA = new long[1];
-            int[]  idB     = new int[1];  long[] offB = new long[1];
+            int[]  idA  = new int[1];  long[] offA = new long[1];
+            int[]  idB  = new int[1];  long[] offB = new long[1];
             boolean temA = lerPar(disA, idA, offA);
             boolean temB = lerPar(disB, idB, offB);
 
-            // Intercalação clássica por comparação de chave
             while (temA && temB) {
-                if (idA[0] <= idB[0]) {
+                // Relê os objetos pelo offset para comparar pelo atributo correto
+                T objA = arquivo.readByOffset(offA[0]);
+                T objB = arquivo.readByOffset(offB[0]);
+
+                // Fallback para comparação por ID caso o objeto tenha sido excluído
+                // entre a geração do run e esta passagem (situação rara mas defensiva)
+                int cmp = (objA != null && objB != null)
+                        ? comparador.compare(objA, objB)
+                        : Integer.compare(idA[0], idB[0]);
+
+                if (cmp <= 0) {
                     dos.writeInt(idA[0]); dos.writeLong(offA[0]);
                     temA = lerPar(disA, idA, offA);
                 } else {
@@ -149,7 +161,7 @@ public class OrdenacaoExterna<T extends Registro> {
                 }
             }
 
-            // Esgota o que sobrou
+            // Esgota o que sobrou de cada run
             while (temA) { dos.writeInt(idA[0]); dos.writeLong(offA[0]); temA = lerPar(disA, idA, offA); }
             while (temB) { dos.writeInt(idB[0]); dos.writeLong(offB[0]); temB = lerPar(disB, idB, offB); }
         }
@@ -179,8 +191,8 @@ public class OrdenacaoExterna<T extends Registro> {
             int n = dis.readInt();
             long[][] pares = new long[n][2];
             for (int i = 0; i < n; i++) {
-                pares[i][0] = dis.readInt();   // id
-                pares[i][1] = dis.readLong();  // offset
+                pares[i][0] = dis.readInt();  // id
+                pares[i][1] = dis.readLong(); // offset
             }
             run.delete();
             return pares;

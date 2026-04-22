@@ -12,6 +12,7 @@ import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
+import src.util.OrdenacaoExterna;
 
 /**
  * DAO da tabela intermédia livros_autores (N:N entre Livros e Autores).
@@ -129,6 +130,45 @@ public class LivroAutorDAO {
             if (excluirPorId(la.getId())) removidos++;
         }
         return removidos;
+    }
+
+    public List<LivroAutor> listarOrdenadoPorId() throws Exception {
+        long[][] pares = indiceId.listarOrdenado();
+        List<LivroAutor> res = new ArrayList<>();
+        for (long[] par : pares) {
+            LivroAutor la = arqLivrosAutores.readByOffset(par[1]);
+            if (la != null) res.add(la);
+        }
+        return res;
+    }
+
+    public List<LivroAutor> listarOrdenadoDecrescentePorId() throws Exception {
+        long[][] pares = indiceId.listarOrdenadoDecrescente();
+        List<LivroAutor> res = new ArrayList<>();
+        for (long[] par : pares) {
+            LivroAutor la = arqLivrosAutores.readByOffset(par[1]);
+            if (la != null) res.add(la);
+        }
+        return res;
+    }
+
+    /**
+     * Ordenação externa por intercalação — ordena os vínculos pelo idLivro
+     * sem carregar todos os registros na RAM de uma vez.
+     */
+    public List<LivroAutor> listarOrdenadoPorIdLivro() throws Exception {
+        OrdenacaoExterna<LivroAutor> ord = new OrdenacaoExterna<>(
+            arqLivrosAutores,
+            LivroAutor.class.getConstructor(),
+            (a, b) -> Integer.compare(a.getIdLivro(), b.getIdLivro())
+        );
+        long[][] pares = ord.ordenar();
+        List<LivroAutor> res = new ArrayList<>();
+        for (long[] par : pares) {
+            LivroAutor la = arqLivrosAutores.readByOffset(par[1]);
+            if (la != null) res.add(la);
+        }
+        return res;
     }
 
     // -------------------------------------------------------------------------

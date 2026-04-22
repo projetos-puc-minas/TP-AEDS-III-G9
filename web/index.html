@@ -1,164 +1,682 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BiblioSys — Painel Admin</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BiblioSys — Painel Administrativo</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- SIDEBAR -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">B</div>
-      <div>
-        <div class="logo-title">BiblioSys</div>
-        <div class="logo-sub">Painel Admin · G9</div>
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📚</div>
+    <div class="logo-text">
+      <strong>BiblioSys</strong>
+      <span>AEDs III — G9</span>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Principal</div>
+    <a class="nav-item active" onclick="navigate('dashboard', this)">
+      <span class="nav-icon">⊞</span> Dashboard
+    </a>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Cadastros</div>
+    <a class="nav-item" onclick="navigate('autores', this)">
+      <span class="nav-icon">✍️</span> Autores
+    </a>
+    <a class="nav-item" onclick="navigate('editoras', this)">
+      <span class="nav-icon">🏢</span> Editoras
+    </a>
+    <a class="nav-item" onclick="navigate('livros', this)">
+      <span class="nav-icon">📖</span> Livros
+    </a>
+    <a class="nav-item" onclick="navigate('livros_autores', this)">
+      <span class="nav-icon">🔗</span> Livros-Autores
+    </a>
+    <a class="nav-item" onclick="navigate('tags', this)">
+      <span class="nav-icon">🏷️</span> Tags
+    </a>
+    <a class="nav-item" onclick="navigate('tags_livros', this)">
+      <span class="nav-icon">🔖</span> Tags-Livros
+    </a>
+    <a class="nav-item" onclick="navigate('usuarios', this)">
+      <span class="nav-icon">👤</span> Usuários
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="user-avatar">A</div>
+      <div class="user-info">
+        <strong>Admin</strong>
+        <span>AEDs III — G9</span>
       </div>
     </div>
+  </div>
+</aside>
 
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Acervo</div>
-      <button class="nav-item active" data-module="livros">
-        <span class="nav-icon">📖</span>
-        <span>Livros</span>
-        <span class="nav-badge" id="badge-livros">0</span>
-      </button>
-      <button class="nav-item" data-module="editoras">
-        <span class="nav-icon">🏛</span>
-        <span>Editoras</span>
-        <span class="nav-badge" id="badge-editoras">0</span>
-      </button>
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
 
-      <div class="nav-section-label">Pessoas</div>
-      <button class="nav-item" data-module="autores">
-        <span class="nav-icon">✍️</span>
-        <span>Autores</span>
-        <span class="nav-badge" id="badge-autores">0</span>
-      </button>
-      <button class="nav-item" data-module="usuarios">
-        <span class="nav-icon">👤</span>
-        <span>Usuários</span>
-        <span class="nav-badge" id="badge-usuarios">0</span>
-      </button>
-    </nav>
-
-    <div class="sidebar-footer">
-      <span class="status-dot"></span>
-      <span class="status-text">API conectada</span>
-      <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
-        <span class="theme-toggle-icon active" id="icon-light">☀️</span>
-        <span class="theme-toggle-icon" id="icon-dark">🌙</span>
-      </button>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-breadcrumb">
+      <span>BiblioSys</span>
+      <span>›</span>
+      <span class="current" id="breadcrumb-current">Dashboard</span>
     </div>
-  </aside>
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" placeholder="Pesquisar na tabela…" oninput="filterCurrentTable(this.value)">
+    </div>
+    <div class="topbar-actions">
+      <div class="icon-btn" id="theme-toggle" title="Alternar tema" onclick="toggleTheme()">☀️</div>
+      <div class="icon-btn" title="Recarregar" onclick="reloadCurrent()">↻</div>
+    </div>
+  </header>
 
-  <!-- MAIN CONTENT -->
-  <main class="main-content">
-    <!-- TOPBAR -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1 class="page-title" id="page-title">Livros</h1>
-        <span class="page-subtitle" id="page-subtitle">Gerencie o acervo</span>
-      </div>
-      <div class="topbar-right">
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" class="search-input" id="search-input" placeholder="Pesquisar..." />
-          <kbd class="search-kbd">⌘K</kbd>
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ─── DASHBOARD ─── -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-subtitle">Visão geral do sistema BiblioSys</div>
         </div>
-        <button class="btn btn-primary" id="btn-new">+ Novo</button>
       </div>
-    </header>
 
-    <!-- FILTER BAR -->
-    <div class="filter-bar" id="filter-bar">
-      <div class="filter-chips" id="filter-chips"></div>
-      <div class="sort-wrap">
-        <label class="sort-label">Ordenar:</label>
-        <select class="sort-select" id="sort-select">
-          <option value="id-asc">ID ↑</option>
-          <option value="id-desc">ID ↓</option>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon green">📖</div>
+          <div class="stat-info"><label>Livros</label><strong id="dash-livros">—</strong><small>cadastrados</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal">✍️</div>
+          <div class="stat-info"><label>Autores</label><strong id="dash-autores">—</strong><small>registrados</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">🏢</div>
+          <div class="stat-info"><label>Editoras</label><strong id="dash-editoras">—</strong><small>ativas</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon yellow">🔗</div>
+          <div class="stat-info"><label>Vínculos</label><strong id="dash-vinculos">—</strong><small>livro-autor</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">🏷️</div>
+          <div class="stat-info"><label>Tags</label><strong id="dash-tags">—</strong><small>ativas</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon pink">🔖</div>
+          <div class="stat-info"><label>Tags-Livros</label><strong id="dash-tags-livros">—</strong><small>vínculos</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal">👤</div>
+          <div class="stat-info"><label>Usuários</label><strong id="dash-usuarios">—</strong><small>registrados</small></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Módulo</th>
+              <th>Registros</th>
+              <th>Endpoint</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>📖 Livros</td><td><span id="dt-livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>✍️ Autores</td><td><span id="dt-autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>🏢 Editoras</td><td><span id="dt-editoras" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/editoras</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>🔗 Livros-Autores</td><td><span id="dt-livros_autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros-autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>🏷️ Tags</td><td><span id="dt-tags" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>🔖 Tags-Livros</td><td><span id="dt-tags_livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags-livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr><td>👤 Usuários</td><td><span id="dt-usuarios" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/usuarios</td><td><span class="tag-pill">● Ativo</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── LIVROS ─── -->
+    <!-- Colunas: ID | Título | Editora (nome) | ISBN | Ano | Preço | Autores | Tags | Ações -->
+    <div id="page-livros" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Livros</div>
+          <div class="page-subtitle">Catálogo de livros com suporte a ordenação via Árvore B+ e Intercalação Externa</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('livros')">＋ Novo Livro</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar livros…" oninput="filterTable('livros-tbody', this.value)">
+        </div>
+        <div class="order-toggle">
+          <button class="order-btn active" onclick="setOrder('livros','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
+          <button class="order-btn" onclick="setOrder('livros','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
+          <button class="order-btn" onclick="loadTituloOrder()" title="Por Título — Ordenação por Intercalação (3d-1)">Az Título</button>
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('livros')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Título</th><th>Editora</th><th>ISBN</th><th>Ano</th><th>Preço</th><th>Autores</th><th>Tags</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="livros-tbody">
+            <tr class="loading-row"><td colspan="9"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── AUTORES ─── -->
+    <!-- Colunas: ID | Nome | Nascimento | Biografia | Livros | Ações -->
+    <div id="page-autores" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Autores</div>
+          <div class="page-subtitle">Cadastro de autores do acervo</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('autores')">＋ Novo Autor</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar autores…" oninput="filterTable('autores-tbody', this.value)">
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('autores')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Nome</th><th>Nascimento</th><th>Biografia</th><th>Livros</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="autores-tbody">
+            <tr class="loading-row"><td colspan="6"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── EDITORAS ─── -->
+    <div id="page-editoras" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Editoras</div>
+          <div class="page-subtitle">Gerenciamento de editoras — chave estrangeira dos Livros (1:N)</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('editoras')">＋ Nova Editora</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar editoras…" oninput="filterTable('editoras-tbody', this.value)">
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('editoras')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Nome</th><th>Cidade</th><th>Fundação</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="editoras-tbody">
+            <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── LIVROS-AUTORES ─── -->
+    <!-- Agora mostra nome do livro e nome do autor -->
+    <div id="page-livros_autores" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Livros-Autores</div>
+          <div class="page-subtitle">Vínculos N:N entre livros e autores — indexados por Árvore B+ secundária</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('livros_autores')">＋ Novo Vínculo</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar vínculos…" oninput="filterTable('livros-autores-tbody', this.value)">
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('livros_autores')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID Vínculo</th><th>Livro</th><th>Autor</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="livros-autores-tbody">
+            <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── TAGS ─── -->
+    <div id="page-tags" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Tags</div>
+          <div class="page-subtitle">Categorias e etiquetas — Hash Extensível (busca direta) + Árvore B+ (listagem ordenada)</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('tags')">＋ Nova Tag</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar tags…" oninput="filterTable('tags-tbody', this.value)">
+        </div>
+        <div class="order-toggle">
+          <button class="order-btn active" onclick="setOrder('tags','asc',this)" title="Crescente — Travessia das folhas da Árvore B+ (3d-2)">↑ Asc</button>
+          <button class="order-btn" onclick="setOrder('tags','desc',this)" title="Decrescente — Travessia inversa das folhas da Árvore B+ (3d-2)">↓ Desc</button>
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('tags')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Nome da Tag</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="tags-tbody">
+            <tr class="loading-row"><td colspan="3"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── TAGS-LIVROS ─── -->
+    <!-- Agora mostra nome da tag e nome do livro -->
+    <div id="page-tags_livros" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Tags-Livros</div>
+          <div class="page-subtitle">Vínculos N:N entre tags e livros — indexados por Árvore B+ secundária (chave composta)</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('tags_livros')">＋ Novo Vínculo</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar vínculos…" oninput="filterTable('tags-livros-tbody', this.value)">
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('tags_livros')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID Vínculo</th><th>Tag</th><th>Livro</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="tags-livros-tbody">
+            <tr class="loading-row"><td colspan="4"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── USUÁRIOS ─── -->
+    <!-- Colunas: ID | Nome | E-mail | Redes Sociais | Ações -->
+    <div id="page-usuarios" class="page">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Usuários</div>
+          <div class="page-subtitle">Contas de acesso com senha criptografada via XOR e redes sociais</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('usuarios')">＋ Novo Usuário</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-inline">
+          <span>🔍</span>
+          <input type="text" placeholder="Filtrar usuários…" oninput="filterTable('usuarios-tbody', this.value)">
+        </div>
+        <button class="btn btn-ghost" onclick="loadTable('usuarios')">↻</button>
+      </div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Nome</th><th>E-mail</th><th>Redes Sociais</th><th>Ações</th></tr>
+          </thead>
+          <tbody id="usuarios-tbody">
+            <tr class="loading-row"><td colspan="5"><span class="spinner"></span>Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ══════════ MODAL: LIVROS ══════════ -->
+<div class="modal-overlay" id="modal-livros">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-livros-title">Novo Livro</h3>
+      <button class="modal-close" onclick="closeModal('livros')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Título *</label>
+      <input type="text" id="livros-titulo" placeholder="Ex: Dom Casmurro">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>ID da Editora *</label>
+        <input type="number" id="livros-idEditora" placeholder="Ex: 1" min="1">
+      </div>
+      <div class="form-group">
+        <label>ISBN (13 chars)</label>
+        <input type="text" id="livros-isbn" placeholder="Ex: 9788535902778" maxlength="13">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Ano de Publicação</label>
+        <input type="number" id="livros-anoPublicacao" placeholder="Ex: 1899" min="1000" max="2100">
+      </div>
+      <div class="form-group">
+        <label>Preço (R$)</label>
+        <input type="number" id="livros-preco" placeholder="Ex: 39.90" step="0.01" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Sinopse</label>
+      <textarea id="livros-sinopse" rows="3" placeholder="Breve descrição do livro..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Géneros (separados por vírgula)</label>
+      <input type="text" id="livros-generos" placeholder="Ex: Romance, Clássico, Drama">
+    </div>
+
+    <!-- ── Vincular Autores ── -->
+    <div class="form-group vinculos-section">
+      <label class="vinculos-label">✍️ Autores Vinculados</label>
+      <div id="livros-autores-chips" class="vinculos-chips"></div>
+      <div class="vinculos-add-row">
+        <input type="text" id="livros-autor-search-input" class="vinculos-search" placeholder="🔍 Buscar autor pelo nome..." oninput="filterVinculoOptions('livros-autor-datalist', _selectCache.autores, this.value, 'nome')" autocomplete="off" list="livros-autor-datalist">
+        <datalist id="livros-autor-datalist"></datalist>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addVinculo('livros','autor')">＋ Adicionar</button>
+      </div>
+    </div>
+
+    <!-- ── Vincular Tags ── -->
+    <div class="form-group vinculos-section">
+      <label class="vinculos-label">🏷️ Tags Vinculadas</label>
+      <div id="livros-tags-chips" class="vinculos-chips"></div>
+      <div class="vinculos-add-row">
+        <input type="text" id="livros-tag-search-input" class="vinculos-search" placeholder="🔍 Buscar tag pelo nome..." oninput="filterVinculoOptions('livros-tag-datalist', _selectCache.tags, this.value, 'nome')" autocomplete="off" list="livros-tag-datalist">
+        <datalist id="livros-tag-datalist"></datalist>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addVinculo('livros','tag')">＋ Adicionar</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="livros-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('livros')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('livros')">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: AUTORES ══════════ -->
+<div class="modal-overlay" id="modal-autores">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-autores-title">Novo Autor</h3>
+      <button class="modal-close" onclick="closeModal('autores')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Nome *</label>
+      <input type="text" id="autores-nome" placeholder="Ex: Machado de Assis">
+    </div>
+    <div class="form-group">
+      <label>Data de Nascimento * (dd/MM/yyyy)</label>
+      <input type="text" id="autores-dataNascimento" placeholder="Ex: 21/06/1839" maxlength="10">
+    </div>
+    <div class="form-group">
+      <label>Biografia</label>
+      <textarea id="autores-biografia" rows="3" placeholder="Breve biografia do autor..."></textarea>
+    </div>
+
+    <!-- ── Vincular Livros ── -->
+    <div class="form-group vinculos-section">
+      <label class="vinculos-label">📖 Livros Vinculados</label>
+      <div id="autores-livros-chips" class="vinculos-chips"></div>
+      <div class="vinculos-add-row">
+        <input type="text" id="autores-livro-search-input" class="vinculos-search" placeholder="🔍 Buscar livro pelo título..." oninput="filterVinculoOptions('autores-livro-datalist', _selectCache.livros, this.value, 'titulo')" autocomplete="off" list="autores-livro-datalist">
+        <datalist id="autores-livro-datalist"></datalist>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addVinculo('autores','livro')">＋ Adicionar</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="autores-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('autores')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('autores')">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: EDITORAS ══════════ -->
+<div class="modal-overlay" id="modal-editoras">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-editoras-title">Nova Editora</h3>
+      <button class="modal-close" onclick="closeModal('editoras')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Nome *</label>
+      <input type="text" id="editoras-nome" placeholder="Ex: Companhia das Letras">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Cidade Sede</label>
+        <input type="text" id="editoras-cidade" placeholder="Ex: São Paulo">
+      </div>
+      <div class="form-group">
+        <label>Ano de Fundação</label>
+        <input type="number" id="editoras-anoFundacao" placeholder="Ex: 1986" min="1800" max="2100">
+      </div>
+    </div>
+    <input type="hidden" id="editoras-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editoras')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('editoras')">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: LIVROS-AUTORES ══════════ -->
+<div class="modal-overlay" id="modal-livros_autores">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-livros_autores-title">Novo Vínculo Livro-Autor</h3>
+      <button class="modal-close" onclick="closeModal('livros_autores')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Livro *</label>
+      <div class="select-search-wrap">
+        <input type="text" class="select-search-input" id="livros_autores-livro-search" placeholder="🔍 Buscar livro pelo título..." oninput="filterSelectOptions('livros_autores-idLivro', this.value)" autocomplete="off">
+        <select id="livros_autores-idLivro" size="4" class="select-list">
+          <option value="" disabled>Carregando livros...</option>
         </select>
       </div>
     </div>
-
-    <!-- TABLE AREA -->
-    <div class="table-wrap">
-      <div class="table-loading" id="table-loading">
-        <div class="spinner"></div>
-        <span>Carregando…</span>
+    <div class="form-group">
+      <label>Autor *</label>
+      <div class="select-search-wrap">
+        <input type="text" class="select-search-input" id="livros_autores-autor-search" placeholder="🔍 Buscar autor pelo nome..." oninput="filterSelectOptions('livros_autores-idAutor', this.value)" autocomplete="off">
+        <select id="livros_autores-idAutor" size="4" class="select-list">
+          <option value="" disabled>Carregando autores...</option>
+        </select>
       </div>
-      <div class="table-empty" id="table-empty" style="display:none">
-        <div class="empty-icon">📭</div>
-        <div>Nenhum registro encontrado</div>
-      </div>
-      <table class="data-table" id="data-table" style="display:none">
-        <thead id="table-head"></thead>
-        <tbody id="table-body"></tbody>
-      </table>
     </div>
-
-    <!-- PAGINATION -->
-    <div class="pagination" id="pagination"></div>
-  </main>
-
-  <!-- MODAL -->
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal" id="modal">
-      <div class="modal-header">
-        <h2 class="modal-title" id="modal-title">Novo Registro</h2>
-        <button class="modal-close" id="modal-close">✕</button>
-      </div>
-      <div class="modal-body" id="modal-body"></div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" id="modal-cancel">Cancelar</button>
-        <button class="btn btn-primary" id="modal-save">Salvar</button>
-      </div>
+    <input type="hidden" id="livros_autores-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('livros_autores')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('livros_autores')">Salvar</button>
     </div>
   </div>
+</div>
 
-  <!-- TOAST -->
-  <div class="toast-container" id="toast-container"></div>
-
-  <!-- CONFIRM DIALOG -->
-  <div class="confirm-overlay" id="confirm-overlay">
-    <div class="confirm-dialog">
-      <div class="confirm-icon">⚠️</div>
-      <div class="confirm-title" id="confirm-title">Confirmar exclusão</div>
-      <div class="confirm-msg" id="confirm-msg">Deseja realmente excluir este registro?</div>
-      <div class="confirm-actions">
-        <button class="btn btn-ghost" id="confirm-cancel">Cancelar</button>
-        <button class="btn btn-danger" id="confirm-ok">Excluir</button>
-      </div>
+<!-- ══════════ MODAL: TAGS ══════════ -->
+<div class="modal-overlay" id="modal-tags">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-tags-title">Nova Tag</h3>
+      <button class="modal-close" onclick="closeModal('tags')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Nome da Tag *</label>
+      <input type="text" id="tags-nome" placeholder="Ex: Ficção Científica">
+    </div>
+    <input type="hidden" id="tags-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('tags')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('tags')">Salvar</button>
     </div>
   </div>
+</div>
 
-  <script src="app.js"></script>
-  <script>
-    // Theme toggle
-    const html = document.documentElement;
-    const btn  = document.getElementById('theme-toggle');
-    const iconLight = document.getElementById('icon-light');
-    const iconDark  = document.getElementById('icon-dark');
+<!-- ══════════ MODAL: TAGS-LIVROS ══════════ -->
+<div class="modal-overlay" id="modal-tags_livros">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-tags_livros-title">Novo Vínculo Tag-Livro</h3>
+      <button class="modal-close" onclick="closeModal('tags_livros')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Tag *</label>
+      <div class="select-search-wrap">
+        <input type="text" class="select-search-input" id="tags_livros-tag-search" placeholder="🔍 Buscar tag pelo nome..." oninput="filterSelectOptions('tags_livros-idTag', this.value)" autocomplete="off">
+        <select id="tags_livros-idTag" size="4" class="select-list">
+          <option value="" disabled>Carregando tags...</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Livro *</label>
+      <div class="select-search-wrap">
+        <input type="text" class="select-search-input" id="tags_livros-livro-search" placeholder="🔍 Buscar livro pelo título..." oninput="filterSelectOptions('tags_livros-idLivro', this.value)" autocomplete="off">
+        <select id="tags_livros-idLivro" size="4" class="select-list">
+          <option value="" disabled>Carregando livros...</option>
+        </select>
+      </div>
+    </div>
+    <input type="hidden" id="tags_livros-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('tags_livros')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('tags_livros')">Salvar</button>
+    </div>
+  </div>
+</div>
 
-    const saved = localStorage.getItem('bibliosys-theme') || 'light';
-    applyTheme(saved);
+<!-- ══════════ MODAL: USUÁRIOS ══════════ -->
+<!-- Inclui widget de redes sociais multivalorado -->
+<div class="modal-overlay" id="modal-usuarios">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-usuarios-title">Novo Usuário</h3>
+      <button class="modal-close" onclick="closeModal('usuarios')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>Nome *</label>
+      <input type="text" id="usuarios-nome" placeholder="Ex: João Silva">
+    </div>
+    <div class="form-group">
+      <label>E-mail *</label>
+      <input type="email" id="usuarios-email" placeholder="Ex: joao@email.com">
+    </div>
+    <div class="form-group" id="usuarios-senha-group">
+      <label>Senha *</label>
+      <input type="password" id="usuarios-senha" placeholder="Mínimo 4 caracteres">
+    </div>
+    <!-- Campo multivalorado: Redes Sociais -->
+    <div class="form-group">
+      <label>Redes Sociais</label>
+      <div id="rs-chips" class="rs-chips-container"></div>
+      <div class="rs-add-row">
+        <input type="text" id="rs-input" placeholder="Ex: instagram.com/usuario" onkeydown="if(event.key==='Enter'){event.preventDefault();addRedeSocial();}">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addRedeSocial()">＋ Adicionar</button>
+      </div>
+      <small style="color:var(--text3);font-size:11px">Pressione Enter ou clique em Adicionar para incluir cada rede social.</small>
+    </div>
+    <input type="hidden" id="usuarios-edit-id">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('usuarios')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRecord('usuarios')">Salvar</button>
+    </div>
+  </div>
+</div>
 
-    btn.addEventListener('click', () => {
-      const next = html.dataset.theme === 'light' ? 'dark' : 'light';
-      applyTheme(next);
-      localStorage.setItem('bibliosys-theme', next);
-    });
+<!-- ══════════ CONFIRM DIALOG ══════════ -->
+<div class="modal-overlay confirm-dialog" id="confirm-dialog">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚠️ Confirmar exclusão</h3>
+      <button class="modal-close" onclick="closeConfirm()">✕</button>
+    </div>
+    <p class="confirm-msg" id="confirm-msg">Tem certeza?</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-danger" onclick="executeDelete()">Excluir</button>
+    </div>
+  </div>
+</div>
 
-    function applyTheme(t) {
-      html.dataset.theme = t;
-      iconLight.classList.toggle('active', t === 'light');
-      iconDark.classList.toggle('active', t === 'dark');
+<!-- ══════════ TOAST ══════════ -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js"></script>
+<script>
+  function filterCurrentTable(val) {
+    const tbodyMap = {
+      livros:         'livros-tbody',
+      autores:        'autores-tbody',
+      editoras:       'editoras-tbody',
+      livros_autores: 'livros-autores-tbody',
+      tags:           'tags-tbody',
+      tags_livros:    'tags-livros-tbody',
+      usuarios:       'usuarios-tbody'
+    };
+    const id = tbodyMap[currentPage];
+    if (id) filterTable(id, val);
+  }
+
+  function reloadCurrent() {
+    if (currentPage === 'dashboard') loadDashboard();
+    else loadTable(currentPage);
+  }
+
+  // Ordenação por título (Intercalação Externa — item 3d-1)
+  async function loadTituloOrder() {
+    document.querySelectorAll('#page-livros .order-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const tbody = document.getElementById('livros-tbody');
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="9"><span class="spinner"></span>Ordenando por intercalação...</td></tr>`;
+    try {
+      const data = await apiFetch('/api/livros?ordem=titulo');
+      renderRows('livros', tbody, data);
+      toast('Ordenado por título via Intercalação Externa (3d-1)', false, true);
+    } catch (e) {
+      toast(e.message, true);
     }
-  </script>
+  }
+</script>
 </body>
 </html>

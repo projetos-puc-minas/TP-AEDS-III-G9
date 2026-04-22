@@ -19,32 +19,37 @@ import src.util.OrdenacaoExterna;
  * * Índice B+: chave = id, valor = offset físico no livros.bin.
  *
  * INTEGRIDADE REFERENCIAL:
- * - excluirLivro() rejeita a exclusão se houver vínculos na tabela livros_autores.
+ * - excluirLivro() rejeita a exclusão se houver vínculos em livros_autores,
+ *   e remove em cascata todos os vínculos em tags_livros antes de deletar.
+ * - excluirLivroEmCascata() remove todos os vínculos (autores E tags) e depois exclui.
  * - O método buscarLivrosPorEditora() é utilizado pelo EditoraDAO para
- * verificar dependências antes de excluir uma editora.
- *
- * CAMPO MULTIVALORADO:
- * - O campo generos (String[]) é gerido de forma segura pelo SerializadorUtil.
+ *   verificar dependências antes de excluir uma editora.
  */
 public class LivroDAO {
 
     private final Arquivo<Livro> arqLivros;
-    private final ArvoreBMais    indiceId;        // B+: listagem ordenada / intervalo
-    private final HashExtensivel hashId;          // Hash: busca direta por PK em O(1)
+    private final ArvoreBMais    indiceId;         // B+: listagem ordenada / intervalo
+    private final HashExtensivel hashId;           // Hash: busca direta por PK em O(1)
     private final ArvoreBMais    indicePorEditora; // B+: relacionamento 1:N (Editora→Livros)
 
-    // Dependência injetada para verificação de integridade referencial (N:N)
+    // Dependências injetadas para verificação de integridade referencial
     private LivroAutorDAO livroAutorDAO;
+    private TagsLivrosDAO tagsLivrosDAO; // NOVO — necessário para cascata de tags
 
     public LivroDAO() throws Exception {
-        arqLivros = new Arquivo<>("livros", Livro.class.getConstructor());
-        indiceId  = new ArvoreBMais("livros_id");
-        hashId    = new HashExtensivel("livros_id");
+        arqLivros        = new Arquivo<>("livros", Livro.class.getConstructor());
+        indiceId         = new ArvoreBMais("livros_id");
+        hashId           = new HashExtensivel("livros_id");
         indicePorEditora = new ArvoreBMais("livros_por_editora");
     }
 
     public void setLivroAutorDAO(LivroAutorDAO dao) {
         this.livroAutorDAO = dao;
+    }
+
+    /** Injeta o TagsLivrosDAO para garantir a cascata de tags na exclusão de livros. */
+    public void setTagsLivrosDAO(TagsLivrosDAO dao) {
+        this.tagsLivrosDAO = dao;
     }
 
     // -------------------------------------------------------------------------
@@ -133,23 +138,13 @@ public class LivroDAO {
         Livro antigo = buscarLivroPorId(livro.getId());
         boolean ok = arqLivros.update(livro);
         if (ok) {
-            // Remove a entrada antiga do índice por editora (pode ter mudado de editora)
             if (antigo != null && antigo.getIdEditora() != livro.getIdEditora()) {
+                // Editora mudou — remove índice antigo e insere o novo após reindexar
                 indicePorEditora.remover(chaveEditora(antigo.getIdEditora(), livro.getId()));
-                // Insere com a nova chave — o reindexar só faz atualizar (mesmo idEditora)
-                // então precisamos inserir explicitamente quando a editora mudou
-                long novoOffset = hashId.buscar(livro.getId());
-                if (novoOffset == ArvoreBMais.NULO) {
-                    // fallback: reindexar vai localizar o offset correto
-                    reindexar(livro.getId());
-                } else {
-                    // reindexar atualiza indiceId e hashId; nós inserimos manualmente no indicePorEditora
-                    reindexar(livro.getId());
-                    // Após reindexar, busca o offset atualizado e insere no índice com nova editora
-                    long offsetAtual = hashId.buscar(livro.getId());
-                    if (offsetAtual != ArvoreBMais.NULO)
-                        indicePorEditora.inserir(chaveEditora(livro.getIdEditora(), livro.getId()), offsetAtual);
-                }
+                reindexar(livro.getId());
+                long offsetAtual = hashId.buscar(livro.getId());
+                if (offsetAtual != ArvoreBMais.NULO)
+                    indicePorEditora.inserir(chaveEditora(livro.getIdEditora(), livro.getId()), offsetAtual);
             } else {
                 // Editora não mudou: reindexar atualiza todos os índices normalmente
                 reindexar(livro.getId());
@@ -159,15 +154,23 @@ public class LivroDAO {
     }
 
     // -------------------------------------------------------------------------
-    // DELETE — com integridade referencial
+    // DELETE — com integridade referencial completa
     // -------------------------------------------------------------------------
 
     /**
-     * Exclui um livro.
-     * Lança IllegalStateException se houver autores vinculados na tabela intermédia.
+     * Exclui um livro com integridade referencial:
+     * - Rejeita se houver autores vinculados em livros_autores.
+     * - Remove em cascata todos os vínculos em tags_livros antes de deletar.
      */
     public boolean excluirLivro(int id) throws Exception {
-        verificarDependentes(id);
+        // Bloqueia exclusão se houver autores vinculados
+        verificarDependentesAutores(id);
+
+        // Remove em cascata os vínculos de tags (não bloqueiam a exclusão)
+        if (tagsLivrosDAO != null) {
+            tagsLivrosDAO.excluirTagsDoLivro(id);
+        }
+
         Livro livro = buscarLivroPorId(id); // precisa do idEditora antes de deletar
         boolean ok = arqLivros.delete(id);
         if (ok) {
@@ -180,13 +183,22 @@ public class LivroDAO {
     }
 
     /**
-     * Exclui o livro E todos os seus vínculos com autores (Delete em Cascata).
+     * Exclui o livro E todos os seus vínculos com autores E tags (Delete em Cascata total).
+     * Use este método quando a interface quiser forçar a exclusão sem verificar dependentes.
      */
     public boolean excluirLivroEmCascata(int id) throws Exception {
         Livro livro = buscarLivroPorId(id); // precisa do idEditora antes de deletar
+
+        // Remove todos os vínculos de autores
         if (livroAutorDAO != null) {
             livroAutorDAO.excluirAutoresDoLivro(id);
         }
+
+        // Remove todos os vínculos de tags
+        if (tagsLivrosDAO != null) {
+            tagsLivrosDAO.excluirTagsDoLivro(id);
+        }
+
         boolean ok = arqLivros.delete(id);
         if (ok) {
             indiceId.remover(id);
@@ -222,10 +234,8 @@ public class LivroDAO {
 
     /**
      * Ordenação por Intercalação — exigência do enunciado (Fase 2, item 3d-1).
-     * Usa OrdenacaoExterna para ordenar fisicamente por título sem carregar
+     * Usa OrdenacaoExterna para ordenar por título sem carregar
      * todos os registros na RAM de uma vez.
-     *
-     * O resultado segue a travessia da B+ para o relatório ordenado.
      */
     public List<Livro> listarOrdenadoPorTitulo() throws Exception {
         OrdenacaoExterna<Livro> ord = new OrdenacaoExterna<>(
@@ -244,8 +254,6 @@ public class LivroDAO {
 
     /**
      * Listagem em ordem DECRESCENTE por ID via travessia da Árvore B+.
-     * A B+ é percorrida crescentemente e o resultado é invertido — a origem
-     * é a estrutura da B+, satisfazendo o requisito do enunciado (Fase 2, item 3d-2).
      */
     public List<Livro> listarOrdenadoDecrescentePorId() throws Exception {
         long[][] pares = indiceId.listarOrdenadoDecrescente();
@@ -265,17 +273,23 @@ public class LivroDAO {
         return res;
     }
 
-
+    // -------------------------------------------------------------------------
+    // Auxiliares
+    // -------------------------------------------------------------------------
 
     /**
      * Chave composta para o índice 1:N: agrupa livros por editora dentro da B+.
-     * Mesma estratégia usada pelo LivroAutorDAO para índices N:N.
      */
     private static int chaveEditora(int idEditora, int idLivro) {
         return (idEditora << 16) | (idLivro & 0xFFFF);
     }
 
-    private void verificarDependentes(int id) throws Exception {
+    /**
+     * Verifica se existem autores vinculados ao livro.
+     * Lança IllegalStateException se houver dependentes, forçando o chamador
+     * a usar excluirLivroEmCascata() ou remover os vínculos manualmente.
+     */
+    private void verificarDependentesAutores(int id) throws Exception {
         if (livroAutorDAO != null && !livroAutorDAO.buscarAutoresDoLivro(id).isEmpty()) {
             throw new IllegalStateException(
                 "O Livro ID " + id + " possui autores vinculados. " +
@@ -284,7 +298,7 @@ public class LivroDAO {
     }
 
     /**
-     * Otimizado: Varre o ficheiro para encontrar o novo offset físico após um update.
+     * Varre o ficheiro para encontrar o novo offset físico após um update.
      * Atualiza os três índices: indiceId, hashId e indicePorEditora.
      */
     private void reindexar(int id) throws Exception {
@@ -303,7 +317,7 @@ public class LivroDAO {
                     ByteArrayInputStream bais = new ByteArrayInputStream(dados);
                     DataInputStream      dis  = new DataInputStream(bais);
 
-                    int idLido      = dis.readInt();
+                    int idLido        = dis.readInt();
                     int idEditoraLido = dis.readInt(); // segundo campo serializado em Livro
 
                     if (idLido == id) {

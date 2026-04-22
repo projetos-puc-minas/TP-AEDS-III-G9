@@ -1,777 +1,851 @@
-/* ============================================================
+/* ══════════════════════════════════════════════
    BiblioSys — app.js
-   SPA: Livros · Editoras · Autores · Usuários
-   ============================================================ */
+   Consome a REST API do ApiServer Java
+   ══════════════════════════════════════════════ */
 
-const API = '';
-const PAGE_SIZE = 15;
+const API = '';  // mesmo host — requests vão para /api/...
 
-/* ── State ──────────────────────────────────────────────── */
-const state = {
-  module:    'livros',
-  records:   [],
-  filtered:  [],
-  page:      1,
-  sort:      { key: 'id', dir: 'asc' },
-  filter:    'all',
-  search:    '',
-  editId:    null,
-  // Cache de relacionamentos
-  editoras:      [],
-  autores:       [],
-  usuarios:      [],
-  livros:        [],
-  livrosAutores: [],
-};
+// ══════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ══════════════════════════════════════════════
+let currentPage  = 'dashboard';
+let currentOrder = {};          // { section: 'asc' | 'desc' }
 
-/* ── API helpers ─────────────────────────────────────────── */
+// ══════════════════════════════════════════════
+//  TEMA CLARO / ESCURO
+// ══════════════════════════════════════════════
+function initTheme() {
+  const saved = localStorage.getItem('bibliosys-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeBtn(saved);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('bibliosys-theme', next);
+  updateThemeBtn(next);
+}
+
+function updateThemeBtn(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+// ══════════════════════════════════════════════
+//  NAVEGAÇÃO
+// ══════════════════════════════════════════════
+function navigate(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+
+  const labels = {
+    dashboard:     'Dashboard',
+    livros:        'Livros',
+    autores:       'Autores',
+    editoras:      'Editoras',
+    livros_autores:'Livros-Autores',
+    tags:          'Tags',
+    tags_livros:   'Tags-Livros',
+    usuarios:      'Usuários'
+  };
+  document.getElementById('breadcrumb-current').textContent = labels[page] || page;
+  currentPage = page;
+
+  if (page === 'dashboard') loadDashboard();
+  else                      loadTable(page);
+}
+
+// ══════════════════════════════════════════════
+//  API HELPERS
+// ══════════════════════════════════════════════
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json' },
-    ...opts,
+    ...opts
   });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.erro || `HTTP ${res.status}`);
-  return json;
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(data.erro || `HTTP ${res.status}`);
+  return data;
 }
 
-const get  = (p)    => apiFetch(p);
-const post = (p, b) => apiFetch(p, { method: 'POST',   body: JSON.stringify(b) });
-const put  = (p, b) => apiFetch(p, { method: 'PUT',    body: JSON.stringify(b) });
-const del  = (p)    => apiFetch(p, { method: 'DELETE' });
+const apiGet    = path         => apiFetch(path);
+const apiPost   = (path, body) => apiFetch(path, { method: 'POST',   body: JSON.stringify(body) });
+const apiPut    = (path, body) => apiFetch(path, { method: 'PUT',    body: JSON.stringify(body) });
+const apiDelete = path         => apiFetch(path, { method: 'DELETE' });
 
-/* ── Module configs ──────────────────────────────────────── */
-const MODULES = {
-  livros: {
-    label:    'Livros',
-    subtitle: 'Gerencie o acervo',
-    apiPath:  '/api/livros',
-    columns: [
-      { key: 'id',            label: 'ID',       render: r => `<span class="cell-id">#${r.id}</span>` },
-      { key: 'titulo',        label: 'Título',   render: r => `<span class="cell-title">${esc(r.titulo)}</span>` },
-      { key: 'editora',       label: 'Editora',  sort: false, render: r => `<span class="cell-muted">${editoraNome(r.idEditora)}</span>` },
-      { key: 'isbn',          label: 'ISBN',     render: r => `<span class="cell-mono">${esc(r.isbn.trim())}</span>` },
-      { key: 'anoPublicacao', label: 'Ano',      render: r => `<span class="cell-muted">${r.anoPublicacao}</span>` },
-      { key: 'preco',         label: 'Preço',    render: r => `<span class="cell-price">R$ ${r.preco.toFixed(2)}</span>` },
-      { key: 'generos',       label: 'Gêneros',  sort: false, render: r => renderGeneros(r.generos) },
-      { key: 'autores',       label: 'Autores',  sort: false, render: r => renderAutoresLivro(r.id) },
-      { key: '_actions',      label: '',         sort: false, render: r => actionBtns(r.id) },
-    ],
-    filters: [{ value: 'all', label: 'Todos' }],
-    sortOptions: [
-      { value: 'id-asc',             label: 'ID ↑' },
-      { value: 'id-desc',            label: 'ID ↓' },
-      { value: 'titulo-asc',         label: 'Título A→Z' },
-      { value: 'titulo-desc',        label: 'Título Z→A' },
-      { value: 'anoPublicacao-desc', label: 'Mais recentes' },
-      { value: 'anoPublicacao-asc',  label: 'Mais antigos' },
-      { value: 'preco-asc',          label: 'Preço ↑' },
-      { value: 'preco-desc',         label: 'Preço ↓' },
-    ],
-  },
+// ══════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════
+async function loadDashboard() {
+  const sections = [
+    { key: 'livros',         endpoint: '/api/livros',         label: '📖 Livros',         statId: 'dash-livros'     },
+    { key: 'autores',        endpoint: '/api/autores',        label: '✍️ Autores',        statId: 'dash-autores'    },
+    { key: 'editoras',       endpoint: '/api/editoras',       label: '🏢 Editoras',       statId: 'dash-editoras'   },
+    { key: 'livros_autores', endpoint: '/api/livros-autores', label: '🔗 Livros-Autores', statId: 'dash-vinculos'   },
+    { key: 'tags',           endpoint: '/api/tags',           label: '🏷️ Tags',           statId: 'dash-tags'       },
+    { key: 'tags_livros',    endpoint: '/api/tags-livros',    label: '🔖 Tags-Livros',    statId: 'dash-tags-livros'},
+    { key: 'usuarios',       endpoint: '/api/usuarios',       label: '👤 Usuários',       statId: 'dash-usuarios'   },
+  ];
 
-  editoras: {
-    label:    'Editoras',
-    subtitle: 'Cadastro de editoras',
-    apiPath:  '/api/editoras',
-    columns: [
-      { key: 'id',          label: 'ID',      render: r => `<span class="cell-id">#${r.id}</span>` },
-      { key: 'nome',        label: 'Nome',    render: r => `<span class="cell-title">${esc(r.nome)}</span>` },
-      { key: 'cidade',      label: 'Cidade',  render: r => `<span class="cell-muted">${esc(r.cidade)}</span>` },
-      { key: 'anoFundacao', label: 'Fundação',render: r => `<span class="cell-mono">${r.anoFundacao}</span>` },
-      { key: '_actions',    label: '',        sort: false, render: r => actionBtns(r.id) },
-    ],
-    filters: [{ value: 'all', label: 'Todas' }],
-    sortOptions: [
-      { value: 'id-asc',          label: 'ID ↑' },
-      { value: 'id-desc',         label: 'ID ↓' },
-      { value: 'nome-asc',        label: 'Nome A→Z' },
-      { value: 'nome-desc',       label: 'Nome Z→A' },
-      { value: 'anoFundacao-asc', label: 'Mais antigas' },
-      { value: 'anoFundacao-desc',label: 'Mais recentes' },
-    ],
-  },
-
-  autores: {
-    label:    'Autores',
-    subtitle: 'Cadastro de autores',
-    apiPath:  '/api/autores',
-    columns: [
-      { key: 'id',                     label: 'ID',        render: r => `<span class="cell-id">#${r.id}</span>` },
-      { key: 'nome',                   label: 'Nome',      render: r => `<span class="cell-title">${esc(r.nome)}</span>` },
-      { key: 'dataNascimentoFormatada',label: 'Nascimento',render: r => `<span class="cell-mono">${esc(r.dataNascimentoFormatada || '')}</span>` },
-      { key: 'biografia',              label: 'Biografia', render: r => `<span class="cell-muted">${truncate(r.biografia, 55)}</span>` },
-      { key: 'livros',                 label: 'Livros',    sort: false, render: r => renderLivrosAutor(r.id) },
-      { key: '_actions',               label: '',          sort: false, render: r => actionBtns(r.id) },
-    ],
-    filters: [{ value: 'all', label: 'Todos' }],
-    sortOptions: [
-      { value: 'id-asc',   label: 'ID ↑' },
-      { value: 'id-desc',  label: 'ID ↓' },
-      { value: 'nome-asc', label: 'Nome A→Z' },
-      { value: 'nome-desc',label: 'Nome Z→A' },
-    ],
-  },
-
-  usuarios: {
-    label:    'Usuários',
-    subtitle: 'Cadastro de usuários',
-    apiPath:  '/api/usuarios',
-    columns: [
-      { key: 'id',       label: 'ID',    render: r => `<span class="cell-id">#${r.id}</span>` },
-      { key: 'nome',     label: 'Nome',  render: r => `<span class="cell-title">${esc(r.nome)}</span>` },
-      { key: 'email',    label: 'Email', render: r => `<span class="cell-mono">${esc(r.email)}</span>` },
-      { key: '_actions', label: '',      sort: false, render: r => actionBtns(r.id) },
-    ],
-    filters: [{ value: 'all', label: 'Todos' }],
-    sortOptions: [
-      { value: 'id-asc',   label: 'ID ↑' },
-      { value: 'id-desc',  label: 'ID ↓' },
-      { value: 'nome-asc', label: 'Nome A→Z' },
-      { value: 'nome-desc',label: 'Nome Z→A' },
-    ],
-  },
-};
-
-/* ── Render helpers ──────────────────────────────────────── */
-function esc(s) {
-  if (!s) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function truncate(s, n) {
-  if (!s) return '';
-  return s.length > n ? esc(s.slice(0, n)) + '…' : esc(s);
-}
-function editoraNome(id) {
-  const e = state.editoras.find(x => x.id === id);
-  return e ? esc(e.nome) : `<span class="cell-id">#${id}</span>`;
-}
-
-function renderGeneros(generos) {
-  if (!generos || !generos.length) return '<span class="cell-muted">—</span>';
-  return `<div class="cell-rels">${generos.map(g =>
-    `<span class="rel-tag-accent">${esc(g)}</span>`
-  ).join('')}</div>`;
-}
-
-function renderAutoresLivro(livroId) {
-  const rels = state.livrosAutores.filter(la => la.idLivro === livroId);
-  if (!rels.length) return '<span class="cell-muted">—</span>';
-  return `<div class="cell-rels">${rels.map(la => {
-    const a = state.autores.find(x => x.id === la.idAutor);
-    return `<span class="rel-tag">${a ? esc(a.nome) : '#'+la.idAutor}</span>`;
-  }).join('')}</div>`;
-}
-
-function renderLivrosAutor(autorId) {
-  const rels = state.livrosAutores.filter(la => la.idAutor === autorId);
-  if (!rels.length) return '<span class="cell-muted">—</span>';
-  return `<div class="cell-rels">${rels.map(la => {
-    const l = state.livros.find(x => x.id === la.idLivro);
-    return `<span class="rel-tag">${l ? esc(l.titulo) : '#'+la.idLivro}</span>`;
-  }).join('')}</div>`;
-}
-
-function actionBtns(id) {
-  return `<div class="cell-actions">
-    <button class="btn btn-icon btn-sm" onclick="openEdit(${id})" title="Editar">✏️</button>
-    <button class="btn btn-icon btn-sm danger" onclick="confirmDelete(${id})" title="Excluir">🗑</button>
-  </div>`;
-}
-
-/* ── Load & refresh ──────────────────────────────────────── */
-async function loadCaches() {
-  const [editoras, autores, usuarios, livros, livrosAutores] = await Promise.allSettled([
-    get('/api/editoras'),
-    get('/api/autores'),
-    get('/api/usuarios'),
-    get('/api/livros'),
-    get('/api/livros-autores'),
-  ]);
-  state.editoras      = editoras.value      || [];
-  state.autores       = autores.value       || [];
-  state.usuarios      = usuarios.value      || [];
-  state.livros        = livros.value        || [];
-  state.livrosAutores = livrosAutores.value || [];
-}
-
-async function loadModule(mod) {
-  setLoading(true);
-  try {
-    const cfg = MODULES[mod];
-    const data = await get(cfg.apiPath);
-    state.records = Array.isArray(data) ? data : [];
-  } catch (e) {
-    toast('Erro ao carregar dados: ' + e.message, 'error');
-    state.records = [];
-  }
-  setLoading(false);
-  applyFiltersAndRender();
-  updateBadge(mod, state.records.length);
-}
-
-async function refreshAllBadges() {
-  const mods = ['livros','editoras','autores','usuarios'];
-  for (const m of mods) {
+  for (const s of sections) {
     try {
-      const d = await get(MODULES[m].apiPath);
-      updateBadge(m, Array.isArray(d) ? d.length : 0);
-    } catch {}
+      const data = await apiGet(s.endpoint);
+      const count = Array.isArray(data) ? data.length : 0;
+      const el = document.getElementById(s.statId);
+      if (el) el.textContent = count;
+      const dtEl = document.getElementById('dt-' + s.key);
+      if (dtEl) dtEl.textContent = count;
+    } catch { /* silencioso */ }
   }
 }
 
-function updateBadge(mod, n) {
-  const el = document.getElementById('badge-' + mod);
-  if (el) el.textContent = n;
-}
+// ══════════════════════════════════════════════
+//  TABELAS — carregamento e renderização
+// ══════════════════════════════════════════════
+async function loadTable(section) {
+  const order = currentOrder[section] || 'asc';
+  const endpointMap = {
+    livros:         `/api/livros${order === 'desc' ? '?ordem=id-desc' : ''}`,
+    autores:        '/api/autores',
+    editoras:       '/api/editoras',
+    livros_autores: '/api/livros-autores',
+    tags:           `/api/tags${order === 'desc' ? '?ordem=id-desc' : ''}`,
+    tags_livros:    '/api/tags-livros',
+    usuarios:       '/api/usuarios',
+  };
 
-/* ── Filtering & sorting ─────────────────────────────────── */
-function applyFiltersAndRender() {
-  let data = [...state.records];
+  const tbodyMap = {
+    livros:         'livros-tbody',
+    autores:        'autores-tbody',
+    editoras:       'editoras-tbody',
+    livros_autores: 'livros-autores-tbody',
+    tags:           'tags-tbody',
+    tags_livros:    'tags-livros-tbody',
+    usuarios:       'usuarios-tbody',
+  };
 
-  if (state.search) {
-    const q = state.search.toLowerCase();
-    data = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  const tbodyId = tbodyMap[section];
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="10"><span class="spinner"></span>Carregando...</td></tr>`;
+
+  try {
+    const data = await apiGet(endpointMap[section]);
+    renderRows(section, tbody, data);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">⚠️</div><p>Erro ao carregar: ${e.message}</p></div></td></tr>`;
   }
-
-  const { key, dir } = state.sort;
-  data.sort((a, b) => {
-    let va = a[key], vb = b[key];
-    if (va === undefined) return 0;
-    if (typeof va === 'string') va = va.toLowerCase();
-    if (typeof vb === 'string') vb = vb.toLowerCase();
-    if (va < vb) return dir === 'asc' ? -1 : 1;
-    if (va > vb) return dir === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  state.filtered = data;
-  state.page = 1;
-  renderTable();
-  renderPagination();
 }
 
-/* ── Table rendering ─────────────────────────────────────── */
-function renderTable() {
-  const cfg  = MODULES[state.module];
-  const data = state.filtered;
-  const start = (state.page - 1) * PAGE_SIZE;
-  const page  = data.slice(start, start + PAGE_SIZE);
+// Helper para renderizar chips de uma lista [{id, nome}] ou array de strings
+function renderChips(items, colorClass = '') {
+  if (!items || items.length === 0) return '<span style="color:var(--text3)">—</span>';
+  return items.map(item => {
+    const label = typeof item === 'string' ? item : (item.nome || item.titulo || String(item));
+    return `<span class="tag-pill ${colorClass}" style="margin:1px 2px">${esc(label)}</span>`;
+  }).join('');
+}
 
-  const head  = document.getElementById('table-head');
-  const body  = document.getElementById('table-body');
-  const tbl   = document.getElementById('data-table');
-  const empty = document.getElementById('table-empty');
-
-  head.innerHTML = `<tr>${cfg.columns.map(c => {
-    const sortable = c.sort !== false;
-    const active   = state.sort.key === c.key;
-    const arrow    = active ? (state.sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
-    return `<th class="${active ? 'sort-active' : ''}" ${sortable ? `onclick="sortBy('${c.key}')"` : ''}>
-      ${c.label}${arrow}
-    </th>`;
-  }).join('')}</tr>`;
-
-  if (!data.length) {
-    tbl.style.display = 'none';
-    empty.style.display = 'flex';
+function renderRows(section, tbody, data) {
+  if (!data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><p>Nenhum registro encontrado</p></div></td></tr>`;
     return;
   }
 
-  empty.style.display = 'none';
-  tbl.style.display = 'table';
-  body.innerHTML = page.map(r =>
-    `<tr>${cfg.columns.map(c => `<td>${c.render(r)}</td>`).join('')}</tr>`
-  ).join('');
-}
+  const renderers = {
+    // Livros: mostra nome da editora, chips de autores e chips de tags
+    livros: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><strong>${esc(r.titulo)}</strong></td>
+      <td><span class="tag-pill blue">${esc(r.nomeEditora || ('Ed. #' + r.idEditora))}</span></td>
+      <td><span class="id-badge">${esc(r.isbn) || '—'}</span></td>
+      <td>${r.anoPublicacao || '—'}</td>
+      <td>R$ ${r.preco ? r.preco.toFixed(2) : '0,00'}</td>
+      <td style="min-width:120px">${renderChips(r.autores)}</td>
+      <td style="min-width:120px">${renderChips(r.tags, 'yellow')}</td>
+      <td class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('livros',${r.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('livros',${r.id},'${esc(r.titulo)}')">🗑️</button>
+      </td>`,
 
-function renderPagination() {
-  const total = state.filtered.length;
-  const pages = Math.ceil(total / PAGE_SIZE);
-  const cur   = state.page;
-  const el    = document.getElementById('pagination');
+    // Autores: mostra chips dos livros vinculados
+    autores: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><div class="row-name-cell"><div class="row-avatar">${esc(r.nome).charAt(0).toUpperCase()}</div><strong>${esc(r.nome)}</strong></div></td>
+      <td>${esc(r.dataNascimentoFormatada) || '—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${esc(r.biografia) || '—'}</td>
+      <td style="min-width:140px">${renderChips(r.livros ? r.livros.map(l => ({nome: l.titulo})) : [], 'blue')}</td>
+      <td class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('autores',${r.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('autores',${r.id},'${esc(r.nome)}')">🗑️</button>
+      </td>`,
 
-  if (pages <= 1) { el.innerHTML = ''; return; }
+    editoras: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><strong>${esc(r.nome)}</strong></td>
+      <td>${esc(r.cidade) || '—'}</td>
+      <td>${r.anoFundacao || '—'}</td>
+      <td class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('editoras',${r.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('editoras',${r.id},'${esc(r.nome)}')">🗑️</button>
+      </td>`,
 
-  let html = `<span class="page-info">${total} registros</span>`;
-  html += `<button class="page-btn" onclick="goPage(${cur-1})" ${cur===1?'disabled':''}>‹</button>`;
+    // Livros-Autores: mostra nomes ao invés de IDs
+    livros_autores: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><span class="tag-pill blue">📖 ${esc(r.nomeLivro || ('Livro #' + r.idLivro))}</span></td>
+      <td><span class="tag-pill">✍️ ${esc(r.nomeAutor || ('Autor #' + r.idAutor))}</span></td>
+      <td class="actions-cell">
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('livros_autores',${r.id},'vínculo #${r.id}')">🗑️</button>
+      </td>`,
 
-  const range = [...new Set([1, cur-1, cur, cur+1, pages])].filter(p => p >= 1 && p <= pages).sort((a,b)=>a-b);
-  let prev = 0;
-  for (const p of range) {
-    if (p - prev > 1) html += `<span style="color:var(--text-3);padding:0 2px">…</span>`;
-    html += `<button class="page-btn ${p===cur?'active':''}" onclick="goPage(${p})">${p}</button>`;
-    prev = p;
-  }
-  html += `<button class="page-btn" onclick="goPage(${cur+1})" ${cur===pages?'disabled':''}>›</button>`;
-  el.innerHTML = html;
-}
+    tags: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><span class="tag-pill">🏷️ ${esc(r.nome)}</span></td>
+      <td class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('tags',${r.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('tags',${r.id},'${esc(r.nome)}')">🗑️</button>
+      </td>`,
 
-function goPage(p) {
-  const pages = Math.ceil(state.filtered.length / PAGE_SIZE);
-  if (p < 1 || p > pages) return;
-  state.page = p;
-  renderTable();
-  renderPagination();
-}
+    // Tags-Livros: mostra nomes ao invés de IDs
+    tags_livros: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><span class="tag-pill yellow">🏷️ ${esc(r.nomeTag || ('Tag #' + r.idTag))}</span></td>
+      <td><span class="tag-pill blue">📖 ${esc(r.nomeLivro || ('Livro #' + r.idLivro))}</span></td>
+      <td class="actions-cell">
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('tags_livros',${r.id},'vínculo #${r.id}')">🗑️</button>
+      </td>`,
 
-function sortBy(key) {
-  if (state.sort.key === key) {
-    state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
-  } else {
-    state.sort.key = key;
-    state.sort.dir = 'asc';
-  }
-  const sel = document.getElementById('sort-select');
-  if (sel) sel.value = `${key}-${state.sort.dir}`;
-  applyFiltersAndRender();
-}
-
-/* ── Filter bar ──────────────────────────────────────────── */
-function renderFilterBar() {
-  const cfg = MODULES[state.module];
-
-  const chips = document.getElementById('filter-chips');
-  chips.innerHTML = cfg.filters.map(f =>
-    `<button class="chip ${state.filter === f.value ? 'active' : ''}" onclick="setFilter('${f.value}')">${f.label}</button>`
-  ).join('');
-
-  const sel = document.getElementById('sort-select');
-  sel.innerHTML = cfg.sortOptions.map(o =>
-    `<option value="${o.value}">${o.label}</option>`
-  ).join('');
-  sel.value = `${state.sort.key}-${state.sort.dir}`;
-}
-
-function setFilter(val) {
-  state.filter = val;
-  renderFilterBar();
-  applyFiltersAndRender();
-}
-
-/* ── Module switch ───────────────────────────────────────── */
-async function switchModule(mod) {
-  state.module = mod;
-  state.search = '';
-  state.filter = 'all';
-  state.sort   = { key: 'id', dir: 'asc' };
-  state.page   = 1;
-
-  document.getElementById('search-input').value = '';
-  document.getElementById('page-title').textContent    = MODULES[mod].label;
-  document.getElementById('page-subtitle').textContent = MODULES[mod].subtitle;
-
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.module === mod);
-  });
-
-  renderFilterBar();
-  await loadModule(mod);
-}
-
-/* ── Modal forms ─────────────────────────────────────────── */
-function openNew() {
-  state.editId = null;
-  document.getElementById('modal-title').textContent = 'Novo ' + MODULES[state.module].label.replace(/s$/, '');
-  document.getElementById('modal-body').innerHTML = buildForm(state.module, null);
-  bindFormEvents();
-  openModal();
-}
-
-async function openEdit(id) {
-  state.editId = id;
-  const cfg = MODULES[state.module];
-  let record = state.records.find(r => r.id === id);
-  if (!record) {
-    try { record = await get(cfg.apiPath + '/' + id); } catch {}
-  }
-  document.getElementById('modal-title').textContent = 'Editar ' + cfg.label.replace(/s$/, '');
-  document.getElementById('modal-body').innerHTML = buildForm(state.module, record);
-  bindFormEvents();
-  openModal();
-}
-
-function buildForm(mod, r) {
-  if (mod === 'livros')   return formLivros(r);
-  if (mod === 'editoras') return formEditoras(r);
-  if (mod === 'autores')  return formAutores(r);
-  if (mod === 'usuarios') return formUsuarios(r);
-  return '';
-}
-
-function formLivros(r) {
-  const opts = state.editoras.map(e =>
-    `<option value="${e.id}" ${r && r.idEditora === e.id ? 'selected' : ''}>${esc(e.nome)}</option>`
-  ).join('');
-
-  const selectedAutores = r
-    ? state.livrosAutores.filter(la => la.idLivro === r.id).map(la => la.idAutor)
-    : [];
-
-  const autoresChips = state.autores.map(a =>
-    `<div class="autor-chip ${selectedAutores.includes(a.id) ? 'selected' : ''}"
-          data-autor-id="${a.id}" onclick="toggleAutorChip(this)">
-      <span class="chip-check">${selectedAutores.includes(a.id) ? '✓' : '+'}</span>
-      ${esc(a.nome)}
-    </div>`
-  ).join('');
-
-  // Gêneros existentes
-  const generosAtuais = (r && r.generos) ? r.generos : [];
-  const generoTagsHtml = generosAtuais.map(g =>
-    `<span class="genero-tag">${esc(g)}<span class="genero-tag-remove" onclick="removeGenero(this)">×</span></span>`
-  ).join('');
-
-  return `
-    <div class="form-group">
-      <label>Título *</label>
-      <input class="form-control" id="f-titulo" value="${r ? esc(r.titulo) : ''}" placeholder="Ex: Dom Casmurro" />
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Editora *</label>
-        <select class="form-control" id="f-idEditora">
-          <option value="">— selecione —</option>
-          ${opts}
-        </select>
-      </div>
-      <div class="form-group">
-        <label>ISBN</label>
-        <input class="form-control" id="f-isbn" maxlength="13" value="${r ? esc(r.isbn.trim()) : ''}" placeholder="9788535914849" />
-        <div class="form-hint">Até 13 dígitos</div>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Ano de Publicação</label>
-        <input class="form-control" type="number" id="f-anoPublicacao" value="${r ? r.anoPublicacao : ''}" placeholder="2024" />
-      </div>
-      <div class="form-group">
-        <label>Preço (R$)</label>
-        <input class="form-control" type="number" step="0.01" id="f-preco" value="${r ? r.preco : ''}" placeholder="49.90" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Sinopse</label>
-      <textarea class="form-control" id="f-sinopse" placeholder="Breve descrição...">${r ? esc(r.sinopse) : ''}</textarea>
-    </div>
-    <div class="form-group">
-      <label>Gêneros</label>
-      <div class="generos-input-wrap">
-        <input class="form-control" id="f-genero-input" placeholder="Ex: Romance" style="flex:1" />
-        <button class="btn btn-ghost btn-sm" type="button" onclick="addGenero()">+ Add</button>
-      </div>
-      <div class="generos-tags" id="generos-tags">${generoTagsHtml}</div>
-      <div class="form-hint">Digite e clique em + Add para adicionar gêneros</div>
-    </div>
-    <div class="form-group">
-      <label>Autores</label>
-      <div class="autores-list" id="autores-list">${autoresChips}</div>
-      <div class="form-hint">Clique para vincular/desvincular autores</div>
-    </div>
-  `;
-}
-
-function formEditoras(r) {
-  return `
-    <div class="form-group">
-      <label>Nome *</label>
-      <input class="form-control" id="f-nome" value="${r ? esc(r.nome) : ''}" placeholder="Ex: Companhia das Letras" />
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Cidade *</label>
-        <input class="form-control" id="f-cidade" value="${r ? esc(r.cidade) : ''}" placeholder="São Paulo" />
-      </div>
-      <div class="form-group">
-        <label>Ano de Fundação</label>
-        <input class="form-control" type="number" id="f-anoFundacao" value="${r ? r.anoFundacao : ''}" placeholder="1990" />
-      </div>
-    </div>
-  `;
-}
-
-function formAutores(r) {
-  const dataBr = r && r.dataNascimentoFormatada ? r.dataNascimentoFormatada : '';
-  return `
-    <div class="form-group">
-      <label>Nome *</label>
-      <input class="form-control" id="f-nome" value="${r ? esc(r.nome) : ''}" placeholder="Ex: Machado de Assis" />
-    </div>
-    <div class="form-group">
-      <label>Data de Nascimento *</label>
-      <input class="form-control" id="f-dataNascimento" value="${dataBr}" placeholder="dd/MM/yyyy" />
-      <div class="form-hint">Formato: dd/MM/yyyy</div>
-    </div>
-    <div class="form-group">
-      <label>Biografia</label>
-      <textarea class="form-control" id="f-biografia" placeholder="Breve biografia...">${r ? esc(r.biografia) : ''}</textarea>
-    </div>
-  `;
-}
-
-function formUsuarios(r) {
-  return `
-    <div class="form-group">
-      <label>Nome *</label>
-      <input class="form-control" id="f-nome" value="${r ? esc(r.nome) : ''}" placeholder="Nome completo" />
-    </div>
-    <div class="form-group">
-      <label>Email *</label>
-      <input class="form-control" type="email" id="f-email" value="${r ? esc(r.email) : ''}" placeholder="usuario@email.com" />
-    </div>
-    <div class="form-group">
-      <label>${r ? 'Nova Senha (deixe vazio para não alterar)' : 'Senha *'}</label>
-      <input class="form-control" type="password" id="f-senha" placeholder="${r ? '••••••••' : 'Mínimo 4 caracteres'}" />
-    </div>
-  `;
-}
-
-function bindFormEvents() {
-  // Enter no campo de gênero adiciona o gênero
-  const gi = document.getElementById('f-genero-input');
-  if (gi) {
-    gi.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); addGenero(); }
-    });
-  }
-}
-
-function toggleAutorChip(el) {
-  el.classList.toggle('selected');
-  const check = el.querySelector('.chip-check');
-  check.textContent = el.classList.contains('selected') ? '✓' : '+';
-}
-
-function addGenero() {
-  const input = document.getElementById('f-genero-input');
-  if (!input) return;
-  const val = input.value.trim();
-  if (!val) return;
-
-  const container = document.getElementById('generos-tags');
-  const tag = document.createElement('span');
-  tag.className = 'genero-tag';
-  tag.innerHTML = `${esc(val)}<span class="genero-tag-remove" onclick="removeGenero(this)">×</span>`;
-  container.appendChild(tag);
-  input.value = '';
-  input.focus();
-}
-
-function removeGenero(el) {
-  el.parentElement.remove();
-}
-
-function getGenerosFromForm() {
-  const tags = document.querySelectorAll('#generos-tags .genero-tag');
-  return [...tags].map(t => t.textContent.replace('×', '').trim()).filter(Boolean);
-}
-
-/* ── Save / CRUD ─────────────────────────────────────────── */
-async function saveRecord() {
-  const mod = state.module;
-  try {
-    if (mod === 'livros')   await saveLivro();
-    else if (mod === 'editoras') await saveEditora();
-    else if (mod === 'autores')  await saveAutor();
-    else if (mod === 'usuarios') await saveUsuario();
-
-    closeModal();
-    await loadCaches();
-    await loadModule(mod);
-    toast('Registro salvo com sucesso!', 'success');
-  } catch (e) {
-    toast(e.message, 'error');
-  }
-}
-
-async function saveLivro() {
-  const titulo    = v('f-titulo');
-  const idEditora = Number(v('f-idEditora'));
-  if (!titulo)    throw new Error('Título é obrigatório.');
-  if (!idEditora) throw new Error('Selecione uma editora.');
-
-  const body = {
-    titulo,
-    idEditora,
-    isbn:          v('f-isbn'),
-    anoPublicacao: Number(v('f-anoPublicacao')) || 0,
-    preco:         parseFloat(v('f-preco')) || 0,
-    sinopse:       v('f-sinopse'),
-    generos:       getGenerosFromForm(),
+    // Usuários: mostra redesSociais como chips
+    usuarios: r => `
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><div class="row-name-cell"><div class="row-avatar">${esc(r.nome).charAt(0).toUpperCase()}</div><strong>${esc(r.nome)}</strong></div></td>
+      <td style="color:var(--text2)">${esc(r.email)}</td>
+      <td style="min-width:160px">${renderChips(r.redesSociais || [], 'blue')}</td>
+      <td class="actions-cell">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('usuarios',${r.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('usuarios',${r.id},'${esc(r.nome)}')">🗑️</button>
+      </td>`,
   };
 
-  let livroId = state.editId;
+  const renderer = renderers[section];
+  if (!renderer) return;
 
-  if (state.editId) {
-    await put('/api/livros/' + state.editId, body);
-  } else {
-    // O POST retorna {"ok":true,"id":N} — usamos o ID direto, sem busca por título
-    const res = await post('/api/livros', body);
-    livroId = res.id || null;
-  }
+  window._tableCache = window._tableCache || {};
+  window._tableCache[section] = data;
 
-  // Sincronizar autores (N:N)
-  if (livroId) {
-    const selectedIds = [...document.querySelectorAll('.autor-chip.selected')]
-                         .map(c => Number(c.dataset.autorId));
-    const currentRels = state.livrosAutores.filter(la => la.idLivro === livroId);
-    const currentIds  = currentRels.map(la => la.idAutor);
-
-    // Remove vínculos desmarcados
-    for (const la of currentRels) {
-      if (!selectedIds.includes(la.idAutor)) {
-        await del('/api/livros-autores/' + la.id).catch(() => {});
-      }
-    }
-    // Adiciona novos vínculos
-    for (const aid of selectedIds) {
-      if (!currentIds.includes(aid)) {
-        await post('/api/livros-autores', { idLivro: livroId, idAutor: aid }).catch(() => {});
-      }
-    }
-  }
+  tbody.innerHTML = data.map(r => `<tr>${renderer(r)}</tr>`).join('');
 }
 
-async function saveEditora() {
-  const nome = v('f-nome');
-  if (!nome) throw new Error('Nome é obrigatório.');
-  const body = { nome, cidade: v('f-cidade'), anoFundacao: Number(v('f-anoFundacao')) || 0 };
-  if (state.editId) await put('/api/editoras/' + state.editId, body);
-  else              await post('/api/editoras', body);
+// ══════════════════════════════════════════════
+//  FILTRO INLINE
+// ══════════════════════════════════════════════
+function filterTable(tbodyId, query) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const q = query.toLowerCase();
+  tbody.querySelectorAll('tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 }
 
-async function saveAutor() {
-  const nome = v('f-nome');
-  const data = v('f-dataNascimento');
-  if (!nome) throw new Error('Nome é obrigatório.');
-  if (!data) throw new Error('Data de nascimento é obrigatória.');
-  const body = { nome, dataNascimento: data, biografia: v('f-biografia') };
-  if (state.editId) await put('/api/autores/' + state.editId, body);
-  else              await post('/api/autores', body);
+// ══════════════════════════════════════════════
+//  ORDENAÇÃO (Árvore B+ crescente / decrescente)
+// ══════════════════════════════════════════════
+function setOrder(section, order, btnEl) {
+  currentOrder[section] = order;
+  const parent = btnEl.closest('.order-toggle');
+  if (parent) parent.querySelectorAll('.order-btn').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+  loadTable(section);
 }
 
-async function saveUsuario() {
-  const nome  = v('f-nome');
-  const email = v('f-email');
-  const senha = v('f-senha');
-  if (!nome)  throw new Error('Nome é obrigatório.');
-  if (!email) throw new Error('Email é obrigatório.');
-  if (!state.editId && (!senha || senha.length < 4))
-    throw new Error('Senha deve ter no mínimo 4 caracteres.');
-  const body = { nome, email };
-  if (senha) body.senha = senha;
-  if (state.editId) await put('/api/usuarios/' + state.editId, body);
-  else              await post('/api/usuarios', body);
-}
+// ══════════════════════════════════════════════
+//  SELECTS DINÂMICOS — Livros-Autores e Tags-Livros
+// ══════════════════════════════════════════════
 
-/* ── Delete ──────────────────────────────────────────────── */
-let pendingDeleteId = null;
+// Cache dos dados para os selects
+let _selectCache = { livros: [], autores: [], tags: [] };
 
-function confirmDelete(id) {
-  pendingDeleteId = id;
-  const r = state.records.find(x => x.id === id);
-  const name = r ? (r.titulo || r.nome || r.email || `#${id}`) : `#${id}`;
-  document.getElementById('confirm-msg').textContent =
-    `Deseja realmente excluir "${name}"? Esta ação não pode ser desfeita.`;
-  document.getElementById('confirm-overlay').classList.add('open');
-}
-
-async function doDelete() {
-  if (!pendingDeleteId) return;
-  const id = pendingDeleteId;
-  document.getElementById('confirm-overlay').classList.remove('open');
-  pendingDeleteId = null;
+async function loadSelectOptions() {
   try {
-    const cfg = MODULES[state.module];
-    await del(cfg.apiPath + '/' + id);
-    await loadCaches();
-    await loadModule(state.module);
-    toast('Registro excluído.', 'success');
+    const [livros, autores, tags] = await Promise.all([
+      apiGet('/api/livros'),
+      apiGet('/api/autores'),
+      apiGet('/api/tags'),
+    ]);
+    _selectCache.livros  = Array.isArray(livros)  ? livros  : [];
+    _selectCache.autores = Array.isArray(autores) ? autores : [];
+    _selectCache.tags    = Array.isArray(tags)    ? tags    : [];
   } catch (e) {
-    toast('Não foi possível excluir: ' + e.message, 'error');
+    // silencioso — o modal mostrará "sem dados"
   }
 }
 
-/* ── Modal helpers ───────────────────────────────────────── */
-function openModal()  { document.getElementById('modal-overlay').classList.add('open'); }
-function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+// ══════════════════════════════════════════════
+//  VÍNCULOS INLINE — chips dentro dos modais de Livro e Autor
+// ══════════════════════════════════════════════
 
-/* ── Toast ───────────────────────────────────────────────── */
-function toast(msg, type = 'info') {
-  const container = document.getElementById('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.innerHTML = `<span class="toast-icon"></span><span class="toast-msg">${esc(msg)}</span>`;
-  container.appendChild(el);
-  setTimeout(() => {
-    el.classList.add('out');
-    setTimeout(() => el.remove(), 300);
-  }, 3500);
+// Estado dos vínculos em edição
+// livros: { autoresIniciais:[{id,vinculoId,nome}], autoresAtuais:[...], tagsIniciais:[...], tagsAtuais:[...] }
+// autores: { livrosIniciais:[{id,vinculoId,titulo}], livrosAtuais:[...] }
+let _vinculosState = {};
+
+function initVinculos(section, record) {
+  if (section === 'livros') {
+    const autores = (record && record.autores) ? record.autores.map(a => ({
+      id: a.id, nome: a.nome, vinculoId: a.vinculoId || null
+    })) : [];
+    const tags = (record && record.tags) ? record.tags.map(t => ({
+      id: t.id, nome: t.nome, vinculoId: t.vinculoId || null
+    })) : [];
+    _vinculosState.livros = {
+      autoresIniciais: autores.map(x => ({...x})),
+      autoresAtuais:   autores.map(x => ({...x})),
+      tagsIniciais:    tags.map(x => ({...x})),
+      tagsAtuais:      tags.map(x => ({...x})),
+    };
+    renderVinculoChips('livros', 'autor');
+    renderVinculoChips('livros', 'tag');
+    // Popula datalists para autocomplete
+    populateDatalist('livros-autor-datalist', _selectCache.autores, 'nome');
+    populateDatalist('livros-tag-datalist',   _selectCache.tags,    'nome');
+    // Limpa campos de busca
+    const ia = document.getElementById('livros-autor-search-input');
+    const it = document.getElementById('livros-tag-search-input');
+    if (ia) ia.value = '';
+    if (it) it.value = '';
+  } else if (section === 'autores') {
+    const livros = (record && record.livros) ? record.livros.map(l => ({
+      id: l.id, titulo: l.titulo, vinculoId: l.vinculoId || null
+    })) : [];
+    _vinculosState.autores = {
+      livrosIniciais: livros.map(x => ({...x})),
+      livrosAtuais:   livros.map(x => ({...x})),
+    };
+    renderVinculoChips('autores', 'livro');
+    populateDatalist('autores-livro-datalist', _selectCache.livros, 'titulo');
+    const il = document.getElementById('autores-livro-search-input');
+    if (il) il.value = '';
+  }
 }
 
-/* ── Loading state ───────────────────────────────────────── */
-function setLoading(on) {
-  document.getElementById('table-loading').style.display = on ? 'flex' : 'none';
-  document.getElementById('data-table').style.display    = on ? 'none' : '';
-  document.getElementById('table-empty').style.display   = 'none';
+function populateDatalist(datalistId, items, labelField) {
+  const dl = document.getElementById(datalistId);
+  if (!dl) return;
+  dl.innerHTML = items.map(item =>
+    `<option value="${esc(item[labelField])}" data-id="${item.id}">`
+  ).join('');
 }
 
-/* ── Helpers ─────────────────────────────────────────────── */
-function v(id) {
+function filterVinculoOptions(datalistId, items, query, labelField) {
+  // Datalist filtra nativo do browser — só popula se precisar restringir
+  populateDatalist(datalistId, items.filter(i =>
+    i[labelField].toLowerCase().includes(query.toLowerCase())
+  ), labelField);
+}
+
+function renderVinculoChips(section, tipo) {
+  // section: 'livros' | 'autores'  ; tipo: 'autor' | 'tag' | 'livro'
+  let items, containerId, labelField;
+  if (section === 'livros' && tipo === 'autor') {
+    items = _vinculosState.livros?.autoresAtuais || [];
+    containerId = 'livros-autores-chips';
+    labelField = 'nome';
+  } else if (section === 'livros' && tipo === 'tag') {
+    items = _vinculosState.livros?.tagsAtuais || [];
+    containerId = 'livros-tags-chips';
+    labelField = 'nome';
+  } else if (section === 'autores' && tipo === 'livro') {
+    items = _vinculosState.autores?.livrosAtuais || [];
+    containerId = 'autores-livros-chips';
+    labelField = 'titulo';
+  }
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML = '<span class="vinculos-empty">Nenhum vínculo ainda</span>';
+    return;
+  }
+
+  container.innerHTML = items.map((item, idx) =>
+    `<span class="vinculos-chip">
+      ${esc(item[labelField])}
+      <button type="button" class="vinculos-chip-remove" onclick="removeVinculo('${section}','${tipo}',${idx})" title="Remover">✕</button>
+    </span>`
+  ).join('');
+}
+
+function addVinculo(section, tipo) {
+  let inputId, cacheKey, labelField;
+  if (section === 'livros' && tipo === 'autor') {
+    inputId = 'livros-autor-search-input'; cacheKey = 'autores'; labelField = 'nome';
+  } else if (section === 'livros' && tipo === 'tag') {
+    inputId = 'livros-tag-search-input'; cacheKey = 'tags'; labelField = 'nome';
+  } else if (section === 'autores' && tipo === 'livro') {
+    inputId = 'autores-livro-search-input'; cacheKey = 'livros'; labelField = 'titulo';
+  }
+
+  const input = document.getElementById(inputId);
+  const query = input ? input.value.trim() : '';
+  if (!query) { toast('Digite o nome para buscar', true); return; }
+
+  // Encontra o item pelo label (case-insensitive)
+  const found = _selectCache[cacheKey].find(i =>
+    i[labelField].toLowerCase() === query.toLowerCase()
+  );
+  if (!found) {
+    toast(`"${query}" não encontrado. Escolha da lista de sugestões.`, true);
+    return;
+  }
+
+  // Evita duplicatas
+  let lista;
+  if (section === 'livros' && tipo === 'autor')  lista = _vinculosState.livros.autoresAtuais;
+  if (section === 'livros' && tipo === 'tag')     lista = _vinculosState.livros.tagsAtuais;
+  if (section === 'autores' && tipo === 'livro')  lista = _vinculosState.autores.livrosAtuais;
+
+  if (lista.some(x => x.id === found.id)) {
+    toast('Esse vínculo já existe', true); return;
+  }
+
+  lista.push({ id: found.id, [labelField]: found[labelField], vinculoId: null });
+  input.value = '';
+  renderVinculoChips(section, tipo);
+}
+
+function removeVinculo(section, tipo, idx) {
+  if (section === 'livros' && tipo === 'autor')  _vinculosState.livros.autoresAtuais.splice(idx, 1);
+  if (section === 'livros' && tipo === 'tag')    _vinculosState.livros.tagsAtuais.splice(idx, 1);
+  if (section === 'autores' && tipo === 'livro') _vinculosState.autores.livrosAtuais.splice(idx, 1);
+  renderVinculoChips(section, tipo);
+}
+
+/**
+ * Aplica o diff de vínculos: cria os novos e remove os excluídos.
+ * Retorna Promise que resolve quando todas as chamadas à API terminam.
+ */
+async function syncVinculos(section, recordId) {
+  const erros = [];
+
+  if (section === 'livros') {
+    const st = _vinculosState.livros;
+
+    // Autores: remover os que saíram
+    for (const ini of st.autoresIniciais) {
+      if (!st.autoresAtuais.some(a => a.id === ini.id)) {
+        // Precisa do id do vínculo — busca via API
+        try {
+          const todos = await apiGet('/api/livros-autores');
+          const vinculo = todos.find(v => v.idLivro === recordId && v.idAutor === ini.id);
+          if (vinculo) await apiDelete(`/api/livros-autores/${vinculo.id}`);
+        } catch (e) { erros.push(e.message); }
+      }
+    }
+    // Autores: criar os novos
+    for (const cur of st.autoresAtuais) {
+      if (!st.autoresIniciais.some(a => a.id === cur.id)) {
+        try { await apiPost('/api/livros-autores', { idLivro: recordId, idAutor: cur.id }); }
+        catch (e) { erros.push(e.message); }
+      }
+    }
+
+    // Tags: remover
+    for (const ini of st.tagsIniciais) {
+      if (!st.tagsAtuais.some(t => t.id === ini.id)) {
+        try {
+          const todos = await apiGet('/api/tags-livros');
+          const vinculo = todos.find(v => v.idLivro === recordId && v.idTag === ini.id);
+          if (vinculo) await apiDelete(`/api/tags-livros/${vinculo.id}`);
+        } catch (e) { erros.push(e.message); }
+      }
+    }
+    // Tags: criar
+    for (const cur of st.tagsAtuais) {
+      if (!st.tagsIniciais.some(t => t.id === cur.id)) {
+        try { await apiPost('/api/tags-livros', { idTag: cur.id, idLivro: recordId }); }
+        catch (e) { erros.push(e.message); }
+      }
+    }
+
+  } else if (section === 'autores') {
+    const st = _vinculosState.autores;
+
+    // Livros: remover
+    for (const ini of st.livrosIniciais) {
+      if (!st.livrosAtuais.some(l => l.id === ini.id)) {
+        try {
+          const todos = await apiGet('/api/livros-autores');
+          const vinculo = todos.find(v => v.idLivro === ini.id && v.idAutor === recordId);
+          if (vinculo) await apiDelete(`/api/livros-autores/${vinculo.id}`);
+        } catch (e) { erros.push(e.message); }
+      }
+    }
+    // Livros: criar
+    for (const cur of st.livrosAtuais) {
+      if (!st.livrosIniciais.some(l => l.id === cur.id)) {
+        try { await apiPost('/api/livros-autores', { idLivro: cur.id, idAutor: recordId }); }
+        catch (e) { erros.push(e.message); }
+      }
+    }
+  }
+
+  if (erros.length > 0) toast('Alguns vínculos falharam: ' + erros.join('; '), true);
+}
+
+function populateSelect(selectId, items, labelFn) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = items.length === 0
+    ? '<option value="" disabled>Nenhum registro encontrado</option>'
+    : items.map(item => `<option value="${item.id}">${esc(labelFn(item))}</option>`).join('');
+  // Nenhum item pré-selecionado por padrão
+  sel.selectedIndex = -1;
+}
+
+function filterSelectOptions(selectId, query) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const q = query.toLowerCase();
+  Array.from(sel.options).forEach(opt => {
+    opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function getSelectValue(selectId) {
+  const sel = document.getElementById(selectId);
+  return sel && sel.value ? parseInt(sel.value) : null;
+}
+
+function clearSelectSearch(searchId, selectId, items, labelFn) {
+  const inp = document.getElementById(searchId);
+  if (inp) inp.value = '';
+  populateSelect(selectId, items, labelFn);
+}
+
+// ══════════════════════════════════════════════
+//  REDES SOCIAIS — widget de chips editáveis
+// ══════════════════════════════════════════════
+let redesSociaisAtual = [];
+
+function initRedesSociais(lista) {
+  redesSociaisAtual = lista ? [...lista] : [];
+  renderRedesSociais();
+}
+
+function renderRedesSociais() {
+  const container = document.getElementById('rs-chips');
+  if (!container) return;
+  container.innerHTML = redesSociaisAtual.map((rs, i) =>
+    `<span class="rs-chip">
+      ${esc(rs)}
+      <button class="rs-chip-remove" onclick="removeRedeSocial(${i})" title="Remover">✕</button>
+    </span>`
+  ).join('');
+}
+
+function addRedeSocial() {
+  const input = document.getElementById('rs-input');
+  const val = input ? input.value.trim() : '';
+  if (!val) return;
+  redesSociaisAtual.push(val);
+  input.value = '';
+  renderRedesSociais();
+}
+
+function removeRedeSocial(i) {
+  redesSociaisAtual.splice(i, 1);
+  renderRedesSociais();
+}
+
+// ══════════════════════════════════════════════
+//  MODALS — abertura e preenchimento
+// ══════════════════════════════════════════════
+async function openModal(section, id) {
+  const isEdit = !!id;
+  let record = null;
+
+  if (isEdit) {
+    const cache = window._tableCache && window._tableCache[section];
+    record = cache ? cache.find(r => r.id === id) : null;
+    if (!record) {
+      try { record = await apiGet(`/api/${section.replace(/_/g,'-')}/${id}`); }
+      catch { toast('Erro ao carregar registro', true); return; }
+    }
+  }
+
+  const titles = {
+    livros:         isEdit ? 'Editar Livro'         : 'Novo Livro',
+    autores:        isEdit ? 'Editar Autor'          : 'Novo Autor',
+    editoras:       isEdit ? 'Editar Editora'        : 'Nova Editora',
+    livros_autores: 'Novo Vínculo Livro-Autor',
+    tags:           isEdit ? 'Editar Tag'            : 'Nova Tag',
+    tags_livros:    'Novo Vínculo Tag-Livro',
+    usuarios:       isEdit ? 'Editar Usuário'        : 'Novo Usuário',
+  };
+
+  document.getElementById(`modal-${section}-title`).textContent = titles[section];
+
+  // Limpa inputs de texto e textareas (mas não os selects — estes são repovoados abaixo)
+  document.querySelectorAll(`#modal-${section} input[type="text"], #modal-${section} input[type="number"], #modal-${section} input[type="email"], #modal-${section} input[type="password"], #modal-${section} textarea`)
+    .forEach(f => f.value = '');
+  document.getElementById(`${section}-edit-id`).value = id || '';
+
+  if (record) {
+    if (section === 'livros') {
+      setVal(`livros-titulo`,       record.titulo);
+      setVal(`livros-idEditora`,    record.idEditora);
+      setVal(`livros-isbn`,         new String(record.isbn || '').trim());
+      setVal(`livros-anoPublicacao`,record.anoPublicacao);
+      setVal(`livros-preco`,        record.preco);
+      setVal(`livros-sinopse`,      record.sinopse);
+      setVal(`livros-generos`,      (record.generos || []).join(', '));
+      await loadSelectOptions();
+      initVinculos('livros', record);
+    } else if (section === 'autores') {
+      setVal(`autores-nome`,           record.nome);
+      setVal(`autores-dataNascimento`, record.dataNascimentoFormatada || '');
+      setVal(`autores-biografia`,      record.biografia);
+      await loadSelectOptions();
+      initVinculos('autores', record);
+    } else if (section === 'editoras') {
+      setVal(`editoras-nome`,        record.nome);
+      setVal(`editoras-cidade`,      record.cidade);
+      setVal(`editoras-anoFundacao`, record.anoFundacao);
+    } else if (section === 'tags') {
+      setVal(`tags-nome`, record.nome);
+    } else if (section === 'livros_autores') {
+      // Para edição não há suporte (vínculo é imutável), mas deixa selects prontos
+    } else if (section === 'tags_livros') {
+      // Para edição não há suporte (vínculo é imutável), mas deixa selects prontos
+    } else if (section === 'usuarios') {
+      setVal(`usuarios-nome`,  record.nome);
+      setVal(`usuarios-email`, record.email);
+      const senhaGroup = document.getElementById('usuarios-senha-group');
+      if (senhaGroup) senhaGroup.style.display = isEdit ? 'none' : '';
+      // Inicializa widget de redes sociais
+      initRedesSociais(record.redesSociais || []);
+    }
+  } else {
+    const senhaGroup = document.getElementById('usuarios-senha-group');
+    if (senhaGroup) senhaGroup.style.display = '';
+    if (section === 'usuarios') initRedesSociais([]);
+    if (section === 'livros') {
+      await loadSelectOptions();
+      initVinculos('livros', null);
+    }
+    if (section === 'autores') {
+      await loadSelectOptions();
+      initVinculos('autores', null);
+    }
+  }
+
+  // Para modais de vínculo: carrega/popula os selects dinâmicos
+  if (section === 'livros_autores') {
+    await loadSelectOptions();
+    // Reseta campos de busca
+    const ls = document.getElementById('livros_autores-livro-search');
+    const as = document.getElementById('livros_autores-autor-search');
+    if (ls) ls.value = '';
+    if (as) as.value = '';
+    populateSelect('livros_autores-idLivro', _selectCache.livros,  r => `#${r.id} — ${r.titulo}`);
+    populateSelect('livros_autores-idAutor', _selectCache.autores, r => `#${r.id} — ${r.nome}`);
+  } else if (section === 'tags_livros') {
+    await loadSelectOptions();
+    const ts = document.getElementById('tags_livros-tag-search');
+    const ls = document.getElementById('tags_livros-livro-search');
+    if (ts) ts.value = '';
+    if (ls) ls.value = '';
+    populateSelect('tags_livros-idTag',   _selectCache.tags,   r => `#${r.id} — ${r.nome}`);
+    populateSelect('tags_livros-idLivro', _selectCache.livros, r => `#${r.id} — ${r.titulo}`);
+  }
+
+  document.getElementById(`modal-${section}`).classList.add('open');
+}
+
+function closeModal(section) {
+  document.getElementById(`modal-${section}`).classList.remove('open');
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val ?? '';
+}
+
+// ══════════════════════════════════════════════
+//  SAVE — POST ou PUT
+// ══════════════════════════════════════════════
+async function saveRecord(section) {
+  const editId = document.getElementById(`${section}-edit-id`).value;
+  const isEdit = !!editId;
+  let body = {};
+
+  try {
+    if (section === 'livros') {
+      const titulo = getVal('livros-titulo');
+      if (!titulo) { toast('Título é obrigatório', true); return; }
+      body = {
+        titulo,
+        idEditora:    parseInt(getVal('livros-idEditora')) || 0,
+        isbn:         getVal('livros-isbn'),
+        anoPublicacao:parseInt(getVal('livros-anoPublicacao')) || 0,
+        preco:        parseFloat(getVal('livros-preco')) || 0,
+        sinopse:      getVal('livros-sinopse'),
+        generos:      getVal('livros-generos').split(',').map(s => s.trim()).filter(Boolean)
+      };
+    } else if (section === 'autores') {
+      const nome = getVal('autores-nome');
+      const data = getVal('autores-dataNascimento');
+      if (!nome) { toast('Nome é obrigatório', true); return; }
+      if (!data)  { toast('Data de nascimento é obrigatória (dd/MM/yyyy)', true); return; }
+      body = {
+        nome,
+        dataNascimento: data,
+        biografia: getVal('autores-biografia')
+      };
+    } else if (section === 'editoras') {
+      const nome = getVal('editoras-nome');
+      if (!nome) { toast('Nome é obrigatório', true); return; }
+      body = {
+        nome,
+        cidade:      getVal('editoras-cidade'),
+        anoFundacao: parseInt(getVal('editoras-anoFundacao')) || 0
+      };
+    } else if (section === 'livros_autores') {
+      const idLivro = getSelectValue('livros_autores-idLivro');
+      const idAutor = getSelectValue('livros_autores-idAutor');
+      if (!idLivro) { toast('Selecione um livro na lista', true); return; }
+      if (!idAutor) { toast('Selecione um autor na lista', true); return; }
+      body = { idLivro, idAutor };
+    } else if (section === 'tags') {
+      const nome = getVal('tags-nome').trim();
+      if (!nome) { toast('Nome da tag é obrigatório', true); return; }
+      body = { nome };
+    } else if (section === 'tags_livros') {
+      const idTag   = getSelectValue('tags_livros-idTag');
+      const idLivro = getSelectValue('tags_livros-idLivro');
+      if (!idTag)   { toast('Selecione uma tag na lista', true); return; }
+      if (!idLivro) { toast('Selecione um livro na lista', true); return; }
+      body = { idTag, idLivro };
+    } else if (section === 'usuarios') {
+      const nome  = getVal('usuarios-nome');
+      const email = getVal('usuarios-email');
+      if (!nome || !email) { toast('Nome e e-mail são obrigatórios', true); return; }
+      body = { nome, email, redesSociais: redesSociaisAtual };
+      const senha = getVal('usuarios-senha');
+      if (senha) body.senha = senha;
+      if (!isEdit && !senha) { toast('Senha obrigatória para novo usuário', true); return; }
+    }
+
+    const apiPath = '/api/' + section.replace(/_/g, '-');
+
+    let savedId = editId ? parseInt(editId) : null;
+    if (isEdit) {
+      await apiPut(`${apiPath}/${editId}`, body);
+      toast(`Registro atualizado com sucesso!`);
+    } else {
+      const res = await apiPost(apiPath, body);
+      // A API retorna { id: N } ou { idCriado: N } dependendo do endpoint
+      savedId = res.id || res.idCriado || res.idAutor || res.idLivro || null;
+      toast(`Registro criado com sucesso!`);
+    }
+
+    // Sincroniza vínculos de autores/tags para livros, e livros para autores
+    if ((section === 'livros' || section === 'autores') && savedId) {
+      await syncVinculos(section, savedId);
+    }
+
+    closeModal(section);
+    loadTable(section);
+    loadDashboard();
+
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function getVal(id) {
   const el = document.getElementById(id);
   return el ? el.value.trim() : '';
 }
 
-/* ── Event wiring ────────────────────────────────────────── */
-document.querySelectorAll('.nav-item').forEach(btn => {
-  btn.addEventListener('click', () => switchModule(btn.dataset.module));
-});
+// ══════════════════════════════════════════════
+//  DELETE
+// ══════════════════════════════════════════════
+let pendingDelete = null;
 
-document.getElementById('btn-new').addEventListener('click', openNew);
-
-document.getElementById('search-input').addEventListener('input', e => {
-  state.search = e.target.value;
-  applyFiltersAndRender();
-});
-
-document.getElementById('sort-select').addEventListener('change', e => {
-  const [key, dir] = e.target.value.split('-');
-  state.sort = { key, dir };
-  applyFiltersAndRender();
-});
-
-document.getElementById('modal-close').addEventListener('click',  closeModal);
-document.getElementById('modal-cancel').addEventListener('click', closeModal);
-document.getElementById('modal-save').addEventListener('click',   saveRecord);
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
-});
-
-document.getElementById('confirm-cancel').addEventListener('click', () => {
-  document.getElementById('confirm-overlay').classList.remove('open');
-  pendingDeleteId = null;
-});
-document.getElementById('confirm-ok').addEventListener('click', doDelete);
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    closeModal();
-    document.getElementById('confirm-overlay').classList.remove('open');
-  }
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-    e.preventDefault();
-    document.getElementById('search-input').focus();
-  }
-});
-
-/* ── Boot ────────────────────────────────────────────────── */
-async function init() {
-  setLoading(true);
-  await loadCaches();
-  renderFilterBar();
-  await loadModule('livros');
-  refreshAllBadges();
+function confirmDelete(section, id, label) {
+  pendingDelete = { section, id };
+  const sectionLabels = {
+    livros: 'livro', autores: 'autor', editoras: 'editora',
+    livros_autores: 'vínculo', tags: 'tag', tags_livros: 'vínculo tag-livro', usuarios: 'usuário'
+  };
+  document.getElementById('confirm-msg').textContent =
+    `Tem certeza que deseja excluir o(a) ${sectionLabels[section] || 'registro'} "${label}"? Esta ação não pode ser desfeita.`;
+  document.getElementById('confirm-dialog').classList.add('open');
 }
 
-init();
+async function executeDelete() {
+  if (!pendingDelete) return;
+  const { section, id } = pendingDelete;
+  const apiPath = '/api/' + section.replace(/_/g, '-');
+  try {
+    await apiDelete(`${apiPath}/${id}`);
+    toast('Registro excluído com sucesso!');
+    closeConfirm();
+    loadTable(section);
+    loadDashboard();
+  } catch (e) {
+    toast(e.message, true);
+    closeConfirm();
+  }
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-dialog').classList.remove('open');
+  pendingDelete = null;
+}
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+function toast(msg, error = false, warn = false) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast' + (error ? ' error' : warn ? ' warn' : '');
+  el.textContent = error ? '⚠️ ' + msg : warn ? '⚡ ' + msg : '✅ ' + msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ══════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Fecha modais ao clicar no overlay
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) {
+        overlay.classList.remove('open');
+        pendingDelete = null;
+      }
+    });
+  });
+
+  loadDashboard();
+});

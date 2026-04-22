@@ -12,40 +12,38 @@ import src.util.SerializadorUtil;
 /**
  * Modelo Principal: Livro.
  * * Demonstra a utilização de campos variados conforme exigido no enunciado:
- * - idEditora     : Chave estrangeira (relacionamento 1:N com Editora).
- * - isbn          : Campo de tamanho fixo (13 caracteres).
- * - generos       : Campo multivalorado (vetor de Strings).
+ * - idEditora : Chave estrangeira (relacionamento 1:N com Editora).
+ * - isbn      : Campo de tamanho fixo (13 caracteres).
  * * Toda a serialização delega o tratamento de Strings para o SerializadorUtil,
  * garantindo a integridade dos ficheiros binários através do delimitador ';'.
  */
 public class Livro implements Registro {
 
-    private boolean  lapide;
-    private int      tamRegistro;
-    private int      id;
-    private int      idEditora;
-    private String   titulo;
-    private char[]   isbn;           // 13 caracteres fixos
-    private int      anoPublicacao;
-    private double   preco;
-    private String   sinopse;
-    private String[] generos;        // Campo multivalorado
+    private boolean lapide;
+    private int     tamRegistro;
+    private int     id;
+    private int     idEditora;
+    private String  titulo;
+    private char[]  isbn;           // 13 caracteres fixos
+    private int     anoPublicacao;
+    private double  preco;
+    private String  sinopse;
 
     // -------------------------------------------------------------------------
     // Construtores
     // -------------------------------------------------------------------------
 
     public Livro() {
-        this(-1, -1, "", new char[13], 0, 0.0, "", new String[0]);
+        this(-1, -1, "", new char[13], 0, 0.0, "");
     }
 
     public Livro(int idEditora, String titulo, char[] isbn, int anoPublicacao,
-                 double preco, String sinopse, String[] generos) {
-        this(-1, idEditora, titulo, isbn, anoPublicacao, preco, sinopse, generos);
+                 double preco, String sinopse) {
+        this(-1, idEditora, titulo, isbn, anoPublicacao, preco, sinopse);
     }
 
     public Livro(int id, int idEditora, String titulo, char[] isbn, int anoPublicacao,
-                 double preco, String sinopse, String[] generos) {
+                 double preco, String sinopse) {
         this.lapide        = true;
         this.id            = id;
         this.idEditora     = idEditora;
@@ -54,7 +52,6 @@ public class Livro implements Registro {
         this.anoPublicacao = anoPublicacao;
         this.preco         = preco;
         this.sinopse       = sinopse;
-        this.generos       = generos;
     }
 
     // -------------------------------------------------------------------------
@@ -92,9 +89,6 @@ public class Livro implements Registro {
     public String   getSinopse()                      { return sinopse; }
     public void     setSinopse(String sinopse)        { this.sinopse = sinopse; }
 
-    public String[] getGeneros()                      { return generos; }
-    public void     setGeneros(String[] generos)      { this.generos = generos; }
-
     // -------------------------------------------------------------------------
     // Serialização (Padrão do Projeto)
     // -------------------------------------------------------------------------
@@ -111,7 +105,6 @@ public class Livro implements Registro {
         dos.writeInt(anoPublicacao);
         dos.writeDouble(preco);
         SerializadorUtil.writeString(dos, sinopse);
-        SerializadorUtil.writeStringArray(dos, generos); // Serializa o vetor de Strings
 
         return baos.toByteArray();
     }
@@ -128,7 +121,6 @@ public class Livro implements Registro {
         this.anoPublicacao = dis.readInt();
         this.preco         = dis.readDouble();
         this.sinopse       = SerializadorUtil.readString(dis);
-        this.generos       = SerializadorUtil.readStringArray(dis);
     }
 
     // -------------------------------------------------------------------------
@@ -137,15 +129,12 @@ public class Livro implements Registro {
 
     @Override
     public String toString() {
-        String gStr = (generos != null && generos.length > 0)
-                ? String.join(", ", generos) : "(nenhum)";
         return "\nID...............: " + id
              + "\nID Editora.......: " + idEditora
              + "\nTítulo...........: " + titulo
              + "\nISBN.............: " + new String(isbn)
              + "\nAno de Publicação: " + anoPublicacao
              + "\nPreço............: R$ " + preco
-             + "\nSinopse..........: " + sinopse
-             + "\nGéneros..........: " + gStr;
+             + "\nSinopse..........: " + sinopse;
     }
 }

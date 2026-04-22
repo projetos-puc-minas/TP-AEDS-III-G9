@@ -16,6 +16,7 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 public class ApiServer {
@@ -34,10 +35,12 @@ public class ApiServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
         server.createContext("/api/livros-autores", new LivrosAutoresHandler());
+        server.createContext("/api/tags-livros",    new TagsLivrosHandler());
         server.createContext("/api/livros",         new LivrosHandler());
         server.createContext("/api/autores",        new AutoresHandler());
         server.createContext("/api/editoras",       new EditorasHandler());
         server.createContext("/api/usuarios",       new UsuariosHandler());
+        server.createContext("/api/tags",           new TagsHandler());
         server.createContext("/api/auth",           new AuthHandler());
         server.createContext("/",                   new StaticHandler(webRoot));
 
@@ -71,7 +74,8 @@ public class ApiServer {
         }
     }
 
-    // --- HANDLER: LIVROS (GET list, GET /:id, POST, PUT /:id, DELETE /:id) ---
+    // --- HANDLER: LIVROS ---
+    // Retorna nomeEditora, lista de autores (nomes) e lista de tags (nomes)
     private class LivrosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -87,13 +91,10 @@ public class ApiServer {
                         if (l == null) { send404(ex); return; }
                         sendJson(ex, 200, livroToJson(l).toString());
                     } else {
-                        // ?ordem=titulo  → Ordenação Externa por Intercalação (3d-1)
-                        // ?ordem=id-desc → Decrescente por travessia da Árvore B+  (3d-2)
-                        // (padrão)       → Crescente por travessia da Árvore B+    (3d-2)
                         String query = ex.getRequestURI().getQuery();
-                        boolean porTitulo  = query != null && query.contains("ordem=titulo");
+                        boolean porTitulo   = query != null && query.contains("ordem=titulo");
                         boolean decrescente = query != null && query.contains("ordem=id-desc");
-                        java.util.List<Livro> lista;
+                        List<Livro> lista;
                         if (porTitulo) {
                             lista = dao.listarOrdenadoPorTitulo();
                         } else if (decrescente) {
@@ -113,8 +114,7 @@ public class ApiServer {
                         padIsbn(j.optString("isbn")),
                         j.optInt("anoPublicacao"),
                         j.optDouble("preco"),
-                        j.optString("sinopse"),
-                        parseStringArray(j, "generos")
+                        j.optString("sinopse")
                     );
                     int novoId = dao.incluirLivro(novo);
                     sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
@@ -129,12 +129,11 @@ public class ApiServer {
                     existente.setAnoPublicacao(j.optInt("anoPublicacao"));
                     existente.setPreco(j.optDouble("preco"));
                     existente.setSinopse(j.optString("sinopse"));
-                    existente.setGeneros(parseStringArray(j, "generos"));
                     boolean ok = dao.alterarLivro(existente);
                     sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
                 } else if ("DELETE".equals(method)) {
                     if (id <= 0) { send404(ex); return; }
-                    // Cascata: remove vínculos com autores antes de apagar o livro
+                    factory.getTagsLivrosDAO().excluirTagsDoLivro(id);
                     boolean ok = dao.excluirLivroEmCascata(id);
                     sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
                 } else {
@@ -144,21 +143,53 @@ public class ApiServer {
         }
 
         private JSONObject livroToJson(Livro l) {
-            JSONArray generos = new JSONArray();
-            if (l.getGeneros() != null) for (String g : l.getGeneros()) generos.put(g);
+            // Nome da editora
+            String nomeEditora = "Editora #" + l.getIdEditora();
+            try {
+                Editora ed = factory.getEditoraDAO().buscarEditora(l.getIdEditora());
+                if (ed != null) nomeEditora = ed.getNome();
+            } catch (Exception ignored) {}
+
+            // Nomes dos autores vinculados
+            JSONArray autoresArr = new JSONArray();
+            try {
+                List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarAutoresDoLivro(l.getId());
+                for (LivroAutor la : vinculos) {
+                    Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
+                    if (a != null) {
+                        autoresArr.put(new JSONObject().put("id", a.getId()).put("nome", a.getNome()));
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // Nomes das tags vinculadas
+            JSONArray tagsArr = new JSONArray();
+            try {
+                List<TagsLivros> vinculos = factory.getTagsLivrosDAO().buscarTagsDoLivro(l.getId());
+                for (TagsLivros tl : vinculos) {
+                    Tag t = factory.getTagDAO().buscarTag(tl.getIdTag());
+                    if (t != null) {
+                        tagsArr.put(new JSONObject().put("id", t.getId()).put("nome", t.getNome()));
+                    }
+                }
+            } catch (Exception ignored) {}
+
             return new JSONObject()
                 .put("id",            l.getId())
                 .put("idEditora",     l.getIdEditora())
+                .put("nomeEditora",   nomeEditora)
                 .put("titulo",        l.getTitulo())
                 .put("isbn",          new String(l.getIsbn()).trim())
                 .put("anoPublicacao", l.getAnoPublicacao())
                 .put("preco",         l.getPreco())
                 .put("sinopse",       l.getSinopse() != null ? l.getSinopse() : "")
-                .put("generos",       generos);
+                .put("autores",       autoresArr)
+                .put("tags",          tagsArr);
         }
     }
 
-    // --- HANDLER: AUTORES (GET list, POST, PUT /:id, DELETE /:id) ---
+    // --- HANDLER: AUTORES ---
+    // Retorna lista de livros (títulos) vinculados ao autor
     private class AutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -174,7 +205,6 @@ public class ApiServer {
                     sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
-                    // Front envia dataNascimento como string "dd/MM/yyyy"
                     long ts = DataUtil.stringToTimestamp(j.getString("dataNascimento"));
                     dao.adicionarAutor(new Autores(j.getString("nome"), ts, j.optString("biografia")));
                     sendJson(ex, 201, "{\"ok\":true}");
@@ -201,16 +231,29 @@ public class ApiServer {
         }
 
         private JSONObject autorToJson(Autores a) {
+            // Livros vinculados ao autor
+            JSONArray livrosArr = new JSONArray();
+            try {
+                List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarLivrosDoAutor(a.getId());
+                for (LivroAutor la : vinculos) {
+                    Livro l = factory.getLivroDAO().buscarLivroPorId(la.getIdLivro());
+                    if (l != null) {
+                        livrosArr.put(new JSONObject().put("id", l.getId()).put("titulo", l.getTitulo()));
+                    }
+                }
+            } catch (Exception ignored) {}
+
             return new JSONObject()
-                .put("id",                      a.getId())
-                .put("nome",                    a.getNome())
-                .put("dataNascimento",          a.getDataNascimento())
+                .put("id",                     a.getId())
+                .put("nome",                   a.getNome())
+                .put("dataNascimento",         a.getDataNascimento())
                 .put("dataNascimentoFormatada", a.getDataNascimentoFormatada())
-                .put("biografia",               a.getBiografia() != null ? a.getBiografia() : "");
+                .put("biografia",              a.getBiografia() != null ? a.getBiografia() : "")
+                .put("livros",                 livrosArr);
         }
     }
 
-    // --- HANDLER: EDITORAS (GET list, POST, PUT /:id, DELETE /:id) ---
+    // --- HANDLER: EDITORAS ---
     private class EditorasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -252,13 +295,13 @@ public class ApiServer {
                     sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
             } catch (IllegalStateException e) {
-                // Integridade referencial: há livros vinculados a esta editora
                 sendJson(ex, 409, "{\"erro\":\"" + e.getMessage().replace("\"", "'") + "\"}");
             } catch (Exception e) { sendError(ex, e); }
         }
     }
 
-    // --- HANDLER: USUARIOS (GET list, POST, PUT /:id, DELETE /:id) ---
+    // --- HANDLER: USUARIOS ---
+    // Agora inclui campo multivalorado redesSociais (String[])
     private class UsuariosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -271,18 +314,26 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     JSONArray arr = new JSONArray();
-                    for (Usuarios u : dao.listarTodos()) {
-                        arr.put(new JSONObject()
-                            .put("id",    u.getId())
-                            .put("nome",  u.getNome())
-                            .put("email", u.getEmail()));
+                    for (Usuarios u : dao.listarOrdenadoPorId()) {
+                        arr.put(usuarioToJson(u));
                     }
                     sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     int novoId = service.cadastrar(j.getString("nome"), j.getString("email"), j.getString("senha"));
-                    if (novoId == -1) sendJson(ex, 409, "{\"erro\":\"Email já cadastrado.\"}");
-                    else              sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
+                    if (novoId == -1) {
+                        sendJson(ex, 409, "{\"erro\":\"Email já cadastrado.\"}");
+                    } else {
+                        // Se vieram redesSociais, salva após criação
+                        if (j.has("redesSociais")) {
+                            Usuarios u = dao.buscarUsuario(novoId);
+                            if (u != null) {
+                                u.setRedesSociais(parseStringArray(j, "redesSociais"));
+                                dao.alterarUsuario(u);
+                            }
+                        }
+                        sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
+                    }
                 } else if ("PUT".equals(method)) {
                     if (id <= 0) { send404(ex); return; }
                     Usuarios existente = dao.buscarUsuario(id);
@@ -297,6 +348,9 @@ public class ApiServer {
                         );
                         existente.setSenhaXor(senhaXor);
                     }
+                    if (j.has("redesSociais")) {
+                        existente.setRedesSociais(parseStringArray(j, "redesSociais"));
+                    }
                     boolean ok = dao.alterarUsuario(existente);
                     sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
                 } else if ("DELETE".equals(method)) {
@@ -308,9 +362,20 @@ public class ApiServer {
                 }
             } catch (Exception e) { sendError(ex, e); }
         }
+
+        private JSONObject usuarioToJson(Usuarios u) {
+            JSONArray rs = new JSONArray();
+            if (u.getRedesSociais() != null) for (String r : u.getRedesSociais()) rs.put(r);
+            return new JSONObject()
+                .put("id",           u.getId())
+                .put("nome",         u.getNome())
+                .put("email",        u.getEmail())
+                .put("redesSociais", rs);
+        }
     }
 
-    // --- HANDLER: N:N LIVROS-AUTORES (GET list, POST, DELETE /:id) ---
+    // --- HANDLER: N:N LIVROS-AUTORES ---
+    // Agora retorna nomeLivro e nomeAutor
     private class LivrosAutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -323,10 +388,23 @@ public class ApiServer {
                 if ("GET".equals(method)) {
                     JSONArray arr = new JSONArray();
                     for (LivroAutor la : dao.listarTodos()) {
+                        String nomeLivro = "Livro #" + la.getIdLivro();
+                        String nomeAutor = "Autor #" + la.getIdAutor();
+                        try {
+                            Livro l = factory.getLivroDAO().buscarLivroPorId(la.getIdLivro());
+                            if (l != null) nomeLivro = l.getTitulo();
+                        } catch (Exception ignored) {}
+                        try {
+                            Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
+                            if (a != null) nomeAutor = a.getNome();
+                        } catch (Exception ignored) {}
+
                         arr.put(new JSONObject()
-                            .put("id",      la.getId())
-                            .put("idLivro", la.getIdLivro())
-                            .put("idAutor", la.getIdAutor()));
+                            .put("id",        la.getId())
+                            .put("idLivro",   la.getIdLivro())
+                            .put("idAutor",   la.getIdAutor())
+                            .put("nomeLivro", nomeLivro)
+                            .put("nomeAutor", nomeAutor));
                     }
                     sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
@@ -341,6 +419,141 @@ public class ApiServer {
                     sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
             } catch (Exception e) { sendError(ex, e); }
+        }
+    }
+
+    // --- HANDLER: N:N TAGS-LIVROS ---
+    // Agora retorna nomeTag e nomeLivro
+    private class TagsLivrosHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            if (handleCors(ex)) return;
+            try {
+                TagsLivrosDAO dao = factory.getTagsLivrosDAO();
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
+                String query  = ex.getRequestURI().getQuery();
+
+                if ("GET".equals(method)) {
+                    List<TagsLivros> lista;
+                    if (query != null && query.startsWith("idTag=")) {
+                        int idTag = Integer.parseInt(query.substring(6));
+                        lista = dao.buscarLivrosDaTag(idTag);
+                    } else if (query != null && query.startsWith("idLivro=")) {
+                        int idLivro = Integer.parseInt(query.substring(8));
+                        lista = dao.buscarTagsDoLivro(idLivro);
+                    } else {
+                        lista = dao.listarTodos();
+                    }
+
+                    JSONArray arr = new JSONArray();
+                    for (TagsLivros tl : lista) {
+                        String nomeTag   = "Tag #"   + tl.getIdTag();
+                        String nomeLivro = "Livro #" + tl.getIdLivro();
+                        try {
+                            Tag t = factory.getTagDAO().buscarTag(tl.getIdTag());
+                            if (t != null) nomeTag = t.getNome();
+                        } catch (Exception ignored) {}
+                        try {
+                            Livro l = factory.getLivroDAO().buscarLivroPorId(tl.getIdLivro());
+                            if (l != null) nomeLivro = l.getTitulo();
+                        } catch (Exception ignored) {}
+
+                        arr.put(new JSONObject()
+                            .put("id",        tl.getId())
+                            .put("idTag",     tl.getIdTag())
+                            .put("idLivro",   tl.getIdLivro())
+                            .put("nomeTag",   nomeTag)
+                            .put("nomeLivro", nomeLivro));
+                    }
+                    sendJson(ex, 200, arr.toString());
+
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    int idTag   = j.getInt("idTag");
+                    int idLivro = j.getInt("idLivro");
+                    if (idTag <= 0 || idLivro <= 0) {
+                        sendJson(ex, 400, "{\"erro\":\"idTag e idLivro são obrigatórios.\"}");
+                        return;
+                    }
+                    boolean ok = dao.vincularTagAoLivro(idTag, idLivro);
+                    sendJson(ex, ok ? 201 : 500, "{\"ok\":" + ok + "}");
+
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirPorId(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
+                }
+            } catch (Exception e) { sendError(ex, e); }
+        }
+    }
+
+    // --- HANDLER: TAGS ---
+    private class TagsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            if (handleCors(ex)) return;
+            try {
+                TagDAO dao = factory.getTagDAO();
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
+
+                if ("GET".equals(method)) {
+                    if (id > 0) {
+                        Tag t = dao.buscarTag(id);
+                        if (t == null) { send404(ex); return; }
+                        sendJson(ex, 200, tagToJson(t).toString());
+                    } else {
+                        String query = ex.getRequestURI().getQuery();
+                        boolean decrescente = query != null && query.contains("ordem=id-desc");
+                        List<Tag> lista = decrescente
+                            ? dao.listarOrdenadoDecrescentePorId()
+                            : dao.listarOrdenadoPorId();
+                        JSONArray arr = new JSONArray();
+                        for (Tag t : lista) arr.put(tagToJson(t));
+                        sendJson(ex, 200, arr.toString());
+                    }
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    String nome = j.getString("nome").trim();
+                    if (nome.isEmpty()) {
+                        sendJson(ex, 400, "{\"erro\":\"O nome da tag não pode ser vazio.\"}");
+                        return;
+                    }
+                    int novoId = dao.criarTag(new Tag(nome));
+                    sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
+                } else if ("PUT".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    Tag existente = dao.buscarTag(id);
+                    if (existente == null) { send404(ex); return; }
+                    JSONObject j = readBody(ex);
+                    String novoNome = j.getString("nome").trim();
+                    if (novoNome.isEmpty()) {
+                        sendJson(ex, 400, "{\"erro\":\"O nome da tag não pode ser vazio.\"}");
+                        return;
+                    }
+                    existente.setNome(novoNome);
+                    boolean ok = dao.alterarTag(existente);
+                    sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirTagEmCascata(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
+                }
+            } catch (IllegalStateException e) {
+                sendJson(ex, 409, "{\"erro\":\"" + e.getMessage().replace("\"", "'") + "\"}");
+            } catch (Exception e) { sendError(ex, e); }
+        }
+
+        private JSONObject tagToJson(Tag t) {
+            return new JSONObject()
+                .put("id",   t.getId())
+                .put("nome", t.getNome());
         }
     }
 
@@ -360,9 +573,10 @@ public class ApiServer {
         }
     }
 
-    // --- AUXILIARES ---
+    // -------------------------------------------------------------------------
+    // AUXILIARES
+    // -------------------------------------------------------------------------
 
-    /** Extrai o ID do path. Ex: /api/livros/42 → 42. Retorna -1 se ausente/inválido. */
     private static int extractId(HttpExchange ex) {
         String[] parts = ex.getRequestURI().getPath().split("/");
         if (parts.length >= 4) {

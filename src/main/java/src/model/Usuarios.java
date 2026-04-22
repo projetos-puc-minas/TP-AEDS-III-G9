@@ -11,38 +11,46 @@ import src.util.SerializadorUtil;
 
 /**
  * Modelo de Utilizador do sistema.
- * * A senha é armazenada de forma segura utilizando criptografia XOR,
- * processada pela camada de serviço antes de chegar ao modelo.
- * * Utiliza o SerializadorUtil com delimitador ';' para garantir a leitura exata
- * dos dados, mesmo em blocos de tamanho variável.
+ *
+ * A senha é armazenada de forma segura utilizando criptografia XOR.
+ *
+ * CAMPO MULTIVALORADO: redesSociais (String[])
+ * Segue o mesmo padrão de serialização do campo generos em Livro,
+ * usando SerializadorUtil.writeStringArray / readStringArray.
  */
 public class Usuarios implements Registro {
 
-    private boolean lapide;
-    private int     tamRegistro;
-    private int     id;
-    private String  nome;
-    private String  email;
-    private String  senhaXor; // Armazenada criptografada em Base64
+    private boolean  lapide;
+    private int      tamRegistro;
+    private int      id;
+    private String   nome;
+    private String   email;
+    private String   senhaXor;       // Armazenada criptografada em Base64
+    private String[] redesSociais;   // Campo multivalorado — ex: ["instagram.com/user", "twitter.com/user"]
 
     // -------------------------------------------------------------------------
     // Construtores
     // -------------------------------------------------------------------------
 
     public Usuarios() {
-        this(-1, "", "", "");
+        this(-1, "", "", "", new String[0]);
     }
 
     public Usuarios(int id, String nome, String email) {
-        this(id, nome, email, "");
+        this(id, nome, email, "", new String[0]);
     }
 
     public Usuarios(int id, String nome, String email, String senhaXor) {
-        this.lapide   = true;
-        this.id       = id;
-        this.nome     = nome;
-        this.email    = email;
-        this.senhaXor = senhaXor;
+        this(id, nome, email, senhaXor, new String[0]);
+    }
+
+    public Usuarios(int id, String nome, String email, String senhaXor, String[] redesSociais) {
+        this.lapide       = true;
+        this.id           = id;
+        this.nome         = nome;
+        this.email        = email;
+        this.senhaXor     = senhaXor;
+        this.redesSociais = redesSociais != null ? redesSociais : new String[0];
     }
 
     // -------------------------------------------------------------------------
@@ -62,17 +70,20 @@ public class Usuarios implements Registro {
     // Getters e Setters
     // -------------------------------------------------------------------------
 
-    public String getNome()                     { return nome; }
-    public void   setNome(String nome)          { this.nome = nome; }
+    public String   getNome()                           { return nome; }
+    public void     setNome(String nome)                { this.nome = nome; }
 
-    public String getEmail()                    { return email; }
-    public void   setEmail(String email)        { this.email = email; }
+    public String   getEmail()                          { return email; }
+    public void     setEmail(String email)              { this.email = email; }
 
-    public String getSenhaXor()                 { return senhaXor; }
-    public void   setSenhaXor(String senhaXor)  { this.senhaXor = senhaXor; }
+    public String   getSenhaXor()                       { return senhaXor; }
+    public void     setSenhaXor(String senhaXor)        { this.senhaXor = senhaXor; }
+
+    public String[] getRedesSociais()                   { return redesSociais; }
+    public void     setRedesSociais(String[] rs)        { this.redesSociais = rs != null ? rs : new String[0]; }
 
     // -------------------------------------------------------------------------
-    // Serialização (Padrão Único do Projeto)
+    // Serialização — campo redesSociais usa writeStringArray/readStringArray
     // -------------------------------------------------------------------------
 
     @Override
@@ -84,6 +95,7 @@ public class Usuarios implements Registro {
         SerializadorUtil.writeString(dos, nome);
         SerializadorUtil.writeString(dos, email);
         SerializadorUtil.writeString(dos, senhaXor);
+        SerializadorUtil.writeStringArray(dos, redesSociais);
 
         return baos.toByteArray();
     }
@@ -93,16 +105,26 @@ public class Usuarios implements Registro {
         ByteArrayInputStream bais = new ByteArrayInputStream(b);
         DataInputStream      dis  = new DataInputStream(bais);
 
-        this.id       = dis.readInt();
-        this.nome     = SerializadorUtil.readString(dis);
-        this.email    = SerializadorUtil.readString(dis);
-        this.senhaXor = SerializadorUtil.readString(dis);
+        this.id           = dis.readInt();
+        this.nome         = SerializadorUtil.readString(dis);
+        this.email        = SerializadorUtil.readString(dis);
+        this.senhaXor     = SerializadorUtil.readString(dis);
+
+        // Compatibilidade retroativa: se não houver mais bytes, array vazio
+        if (dis.available() > 0) {
+            this.redesSociais = SerializadorUtil.readStringArray(dis);
+        } else {
+            this.redesSociais = new String[0];
+        }
     }
 
     @Override
     public String toString() {
-        return "\nID......: " + id
-             + "\nNome....: " + nome
-             + "\nEmail...: " + email;
+        String rs = (redesSociais != null && redesSociais.length > 0)
+                ? String.join(", ", redesSociais) : "(nenhuma)";
+        return "\nID..............: " + id
+             + "\nNome............: " + nome
+             + "\nEmail...........: " + email
+             + "\nRedes Sociais...: " + rs;
     }
 }
