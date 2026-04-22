@@ -881,3 +881,39 @@ body {
 .hash-result-row {
   animation: hashHighlight 2.5s ease-out forwards;
 }
+/* ── Dashboard links ── */
+.stat-card-link {
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.stat-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+  border-color: var(--accent);
+}
+.stat-card-link .stat-arrow {
+  display: block;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: var(--text3);
+  opacity: 0;
+  transition: opacity 0.15s ease, right 0.15s ease;
+}
+.stat-card-link:hover .stat-arrow {
+  opacity: 1;
+  right: 12px;
+}
+
+.tr-link {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.tr-link:hover {
+  background: var(--hover) !important;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}

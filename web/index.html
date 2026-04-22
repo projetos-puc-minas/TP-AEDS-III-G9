@@ -90,34 +90,41 @@
         </div>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
+            <div class="stats-grid">
+        <div class="stat-card stat-card-link" onclick="goTo('livros')" title="Ver Livros">
           <div class="stat-icon green">📖</div>
           <div class="stat-info"><label>Livros</label><strong id="dash-livros">—</strong><small>cadastrados</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('autores')" title="Ver Autores">
           <div class="stat-icon teal">✍️</div>
           <div class="stat-info"><label>Autores</label><strong id="dash-autores">—</strong><small>registrados</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('editoras')" title="Ver Editoras">
           <div class="stat-icon blue">🏢</div>
           <div class="stat-info"><label>Editoras</label><strong id="dash-editoras">—</strong><small>ativas</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('livros_autores')" title="Ver Livros-Autores">
           <div class="stat-icon yellow">🔗</div>
           <div class="stat-info"><label>Vínculos</label><strong id="dash-vinculos">—</strong><small>livro-autor</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('tags')" title="Ver Tags">
           <div class="stat-icon purple">🏷️</div>
           <div class="stat-info"><label>Tags</label><strong id="dash-tags">—</strong><small>ativas</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('tags_livros')" title="Ver Tags-Livros">
           <div class="stat-icon pink">🔖</div>
           <div class="stat-info"><label>Tags-Livros</label><strong id="dash-tags-livros">—</strong><small>vínculos</small></div>
+          <span class="stat-arrow">→</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" onclick="goTo('usuarios')" title="Ver Usuários">
           <div class="stat-icon teal">👤</div>
           <div class="stat-info"><label>Usuários</label><strong id="dash-usuarios">—</strong><small>registrados</small></div>
+          <span class="stat-arrow">→</span>
         </div>
       </div>
 
@@ -132,13 +139,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr><td>📖 Livros</td><td><span id="dt-livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>✍️ Autores</td><td><span id="dt-autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>🏢 Editoras</td><td><span id="dt-editoras" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/editoras</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>🔗 Livros-Autores</td><td><span id="dt-livros_autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros-autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>🏷️ Tags</td><td><span id="dt-tags" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>🔖 Tags-Livros</td><td><span id="dt-tags_livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags-livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
-            <tr><td>👤 Usuários</td><td><span id="dt-usuarios" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/usuarios</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('livros')" title="Ir para Livros"><td>📖 Livros</td><td><span id="dt-livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('autores')" title="Ir para Autores"><td>✍️ Autores</td><td><span id="dt-autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('editoras')" title="Ir para Editoras"><td>🏢 Editoras</td><td><span id="dt-editoras" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/editoras</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('livros_autores')" title="Ir para Livros-Autores"><td>🔗 Livros-Autores</td><td><span id="dt-livros_autores" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/livros-autores</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('tags')" title="Ir para Tags"><td>🏷️ Tags</td><td><span id="dt-tags" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('tags_livros')" title="Ir para Tags-Livros"><td>🔖 Tags-Livros</td><td><span id="dt-tags_livros" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/tags-livros</td><td><span class="tag-pill">● Ativo</span></td></tr>
+            <tr class="tr-link" onclick="goTo('usuarios')" title="Ir para Usuários"><td>👤 Usuários</td><td><span id="dt-usuarios" class="id-badge">—</span></td><td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:12px">/api/usuarios</td><td><span class="tag-pill">● Ativo</span></td></tr>
           </tbody>
         </table>
       </div>

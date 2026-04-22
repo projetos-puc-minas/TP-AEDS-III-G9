@@ -24,7 +24,13 @@ function updateThemeBtn(theme) {
   if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 
-//  NAVEGAÇÃO
+//  NAVEGAÇÃO — helper para links do dashboard
+function goTo(page) {
+  const el = [...document.querySelectorAll('.nav-item')]
+    .find(n => n.getAttribute('onclick') && n.getAttribute('onclick').includes(`'${page}'`));
+  if (el) navigate(page, el);
+}
+
 function navigate(page, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
