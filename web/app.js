@@ -1,19 +1,12 @@
-/* ══════════════════════════════════════════════
-   BiblioSys — app.js
-   Consome a REST API do ApiServer Java
-   ══════════════════════════════════════════════ */
+
 
 const API = '';  // mesmo host — requests vão para /api/...
 
-// ══════════════════════════════════════════════
 //  ESTADO GLOBAL
-// ══════════════════════════════════════════════
 let currentPage  = 'dashboard';
 let currentOrder = {};          // { section: 'asc' | 'desc' }
 
-// ══════════════════════════════════════════════
 //  TEMA CLARO / ESCURO
-// ══════════════════════════════════════════════
 function initTheme() {
   const saved = localStorage.getItem('bibliosys-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
@@ -33,9 +26,7 @@ function updateThemeBtn(theme) {
   if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 
-// ══════════════════════════════════════════════
 //  NAVEGAÇÃO
-// ══════════════════════════════════════════════
 function navigate(page, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');
@@ -60,9 +51,7 @@ function navigate(page, el) {
   else                      loadTable(page);
 }
 
-// ══════════════════════════════════════════════
 //  API HELPERS
-// ══════════════════════════════════════════════
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API + path, {
     headers: { 'Content-Type': 'application/json' },
@@ -79,9 +68,7 @@ const apiPost   = (path, body) => apiFetch(path, { method: 'POST',   body: JSON.
 const apiPut    = (path, body) => apiFetch(path, { method: 'PUT',    body: JSON.stringify(body) });
 const apiDelete = path         => apiFetch(path, { method: 'DELETE' });
 
-// ══════════════════════════════════════════════
 //  DASHBOARD
-// ══════════════════════════════════════════════
 async function loadDashboard() {
   const sections = [
     { key: 'livros',         endpoint: '/api/livros',         label: '📖 Livros',         statId: 'dash-livros'     },
@@ -105,9 +92,7 @@ async function loadDashboard() {
   }
 }
 
-// ══════════════════════════════════════════════
 //  TABELAS — carregamento e renderização
-// ══════════════════════════════════════════════
 async function loadTable(section) {
   const order = currentOrder[section] || 'asc';
   const endpointMap = {
@@ -244,9 +229,7 @@ function renderRows(section, tbody, data) {
   tbody.innerHTML = data.map(r => `<tr>${renderer(r)}</tr>`).join('');
 }
 
-// ══════════════════════════════════════════════
 //  FILTRO INLINE
-// ══════════════════════════════════════════════
 function filterTable(tbodyId, query) {
   const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
@@ -256,9 +239,7 @@ function filterTable(tbodyId, query) {
   });
 }
 
-// ══════════════════════════════════════════════
 //  ORDENAÇÃO (Árvore B+ crescente / decrescente)
-// ══════════════════════════════════════════════
 function setOrder(section, order, btnEl) {
   currentOrder[section] = order;
   const parent = btnEl.closest('.order-toggle');
@@ -267,9 +248,7 @@ function setOrder(section, order, btnEl) {
   loadTable(section);
 }
 
-// ══════════════════════════════════════════════
 //  SELECTS DINÂMICOS — Livros-Autores e Tags-Livros
-// ══════════════════════════════════════════════
 
 // Cache dos dados para os selects
 let _selectCache = { livros: [], autores: [], tags: [] };
@@ -289,13 +268,8 @@ async function loadSelectOptions() {
   }
 }
 
-// ══════════════════════════════════════════════
 //  VÍNCULOS INLINE — chips dentro dos modais de Livro e Autor
-// ══════════════════════════════════════════════
 
-// Estado dos vínculos em edição
-// livros: { autoresIniciais:[{id,vinculoId,nome}], autoresAtuais:[...], tagsIniciais:[...], tagsAtuais:[...] }
-// autores: { livrosIniciais:[{id,vinculoId,titulo}], livrosAtuais:[...] }
 let _vinculosState = {};
 
 function initVinculos(section, record) {
@@ -430,10 +404,7 @@ function removeVinculo(section, tipo, idx) {
   renderVinculoChips(section, tipo);
 }
 
-/**
- * Aplica o diff de vínculos: cria os novos e remove os excluídos.
- * Retorna Promise que resolve quando todas as chamadas à API terminam.
- */
+
 async function syncVinculos(section, recordId) {
   const erros = [];
 
@@ -532,9 +503,7 @@ function clearSelectSearch(searchId, selectId, items, labelFn) {
   populateSelect(selectId, items, labelFn);
 }
 
-// ══════════════════════════════════════════════
 //  REDES SOCIAIS — widget de chips editáveis
-// ══════════════════════════════════════════════
 let redesSociaisAtual = [];
 
 function initRedesSociais(lista) {
@@ -567,9 +536,7 @@ function removeRedeSocial(i) {
   renderRedesSociais();
 }
 
-// ══════════════════════════════════════════════
 //  MODALS — abertura e preenchimento
-// ══════════════════════════════════════════════
 async function openModal(section, id) {
   const isEdit = !!id;
   let record = null;
@@ -681,9 +648,7 @@ function setVal(id, val) {
   if (el) el.value = val ?? '';
 }
 
-// ══════════════════════════════════════════════
 //  SAVE — POST ou PUT
-// ══════════════════════════════════════════════
 async function saveRecord(section) {
   const editId = document.getElementById(`${section}-edit-id`).value;
   const isEdit = !!editId;
@@ -778,9 +743,7 @@ function getVal(id) {
   return el ? el.value.trim() : '';
 }
 
-// ══════════════════════════════════════════════
 //  DELETE
-// ══════════════════════════════════════════════
 let pendingDelete = null;
 
 function confirmDelete(section, id, label) {
@@ -815,9 +778,7 @@ function closeConfirm() {
   pendingDelete = null;
 }
 
-// ══════════════════════════════════════════════
 //  TOAST
-// ══════════════════════════════════════════════
 function toast(msg, error = false, warn = false) {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
@@ -827,9 +788,7 @@ function toast(msg, error = false, warn = false) {
   setTimeout(() => el.remove(), 3200);
 }
 
-// ══════════════════════════════════════════════
 //  HELPERS
-// ══════════════════════════════════════════════
 function esc(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
