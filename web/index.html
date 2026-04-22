@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BiblioSys — Painel Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <span class="logo-icon">⌘</span>
+      <div class="logo-icon">B</div>
       <div>
         <div class="logo-title">BiblioSys</div>
         <div class="logo-sub">Painel Admin · G9</div>
@@ -21,6 +21,7 @@
     </div>
 
     <nav class="sidebar-nav">
+      <div class="nav-section-label">Acervo</div>
       <button class="nav-item active" data-module="livros">
         <span class="nav-icon">📖</span>
         <span>Livros</span>
@@ -31,6 +32,8 @@
         <span>Editoras</span>
         <span class="nav-badge" id="badge-editoras">0</span>
       </button>
+
+      <div class="nav-section-label">Pessoas</div>
       <button class="nav-item" data-module="autores">
         <span class="nav-icon">✍️</span>
         <span>Autores</span>
@@ -46,6 +49,10 @@
     <div class="sidebar-footer">
       <span class="status-dot"></span>
       <span class="status-text">API conectada</span>
+      <button class="theme-toggle" id="theme-toggle" title="Alternar tema">
+        <span class="theme-toggle-icon active" id="icon-light">☀️</span>
+        <span class="theme-toggle-icon" id="icon-dark">🌙</span>
+      </button>
     </div>
   </aside>
 
@@ -131,5 +138,27 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Theme toggle
+    const html = document.documentElement;
+    const btn  = document.getElementById('theme-toggle');
+    const iconLight = document.getElementById('icon-light');
+    const iconDark  = document.getElementById('icon-dark');
+
+    const saved = localStorage.getItem('bibliosys-theme') || 'light';
+    applyTheme(saved);
+
+    btn.addEventListener('click', () => {
+      const next = html.dataset.theme === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+      localStorage.setItem('bibliosys-theme', next);
+    });
+
+    function applyTheme(t) {
+      html.dataset.theme = t;
+      iconLight.classList.toggle('active', t === 'light');
+      iconDark.classList.toggle('active', t === 'dark');
+    }
+  </script>
 </body>
 </html>

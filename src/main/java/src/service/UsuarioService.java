@@ -3,28 +3,31 @@ package src.service;
 import src.dao.UsuarioDAO;
 import src.model.Usuarios;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+
 /**
- * Serviço de autenticação e gerenciamento de usuários.
+ * Serviço de autenticação e gestão de utilizadores.
  *
- * Criptografia XOR implementada manualmente conforme requisito do enunciado.
+ * Criptografia XOR implementada manualmente conforme o requisito do enunciado.
  *
- * A chave XOR é derivada do email do usuário para que dois usuários com a
+ * A chave XOR é derivada do email do utilizador para que dois utilizadores com a
  * mesma senha não tenham o mesmo hash armazenado.
  *
- * Fluxo de cadastro:
- *   1. Recebe email + senha em texto claro
- *   2. Chama xorCriptografar(senha, email) → senhaXor
- *   3. Armazena senhaXor no registro (a senha em texto claro nunca é persistida)
+ * Fluxo de registo:
+ * 1. Recebe email + senha em texto claro
+ * 2. Chama xorCriptografar(senha, email) → senhaXor
+ * 3. Armazena senhaXor no registo (a senha em texto claro nunca é persistida)
  *
  * Fluxo de login:
- *   1. Recebe email + senha em texto claro
- *   2. Busca usuário pelo email
- *   3. Criptografa a senha digitada com a mesma chave (email)
- *   4. Compara com senhaXor armazenada
+ * 1. Recebe email + senha em texto claro
+ * 2. Busca utilizador pelo email
+ * 3. Criptografa a senha digitada com a mesma chave (email)
+ * 4. Compara com senhaXor armazenada
  */
 public class UsuarioService {
 
-    // Chave base fixa adicional para reforçar o XOR (pode ser configurada)
+    // Chave base fixa adicional para reforçar o XOR (funciona como um "salt" estático)
     private static final String CHAVE_BASE = "AEDs3-G9-2025";
 
     private final UsuarioDAO usuarioDAO;
@@ -34,28 +37,27 @@ public class UsuarioService {
     }
 
     // -------------------------------------------------------------------------
-    // Cadastro
+    // Registo
     // -------------------------------------------------------------------------
 
     /**
-     * Cadastra um novo usuário.
+     * Regista um novo utilizador.
      * A senha é criptografada com XOR antes de ser persistida.
      *
-     * @return id gerado, ou -1 se o email já estiver cadastrado
+     * @return id gerado, ou -1 se o email já estiver registado
      */
-    public int cadastrar(String nome, String email, String senhaTextoClaro)
-            throws Exception {
+    public int cadastrar(String nome, String email, String senhaTextoClaro) throws Exception {
 
         if (nome == null || nome.isBlank())
-            throw new IllegalArgumentException("Nome não pode ser vazio.");
+            throw new IllegalArgumentException("O nome não pode estar vazio.");
         if (email == null || email.isBlank())
-            throw new IllegalArgumentException("Email não pode ser vazio.");
+            throw new IllegalArgumentException("O email não pode estar vazio.");
         if (senhaTextoClaro == null || senhaTextoClaro.length() < 4)
-            throw new IllegalArgumentException("Senha deve ter no mínimo 4 caracteres.");
+            throw new IllegalArgumentException("A senha deve ter no mínimo 4 caracteres.");
 
-        // Verifica se email já existe
+        // Verifica se o email já existe
         if (usuarioDAO.buscarPorEmail(email) != null) {
-            return -1; // email já cadastrado
+            return -1; // email já registado
         }
 
         String senhaXor = xorCriptografar(senhaTextoClaro, gerarChave(email));
@@ -68,9 +70,9 @@ public class UsuarioService {
     // -------------------------------------------------------------------------
 
     /**
-     * Autentica um usuário pelo email e senha.
+     * Autentica um utilizador através do email e senha.
      *
-     * @return o objeto Usuarios autenticado, ou null se credenciais inválidas
+     * @return o objeto Usuarios autenticado, ou null se as credenciais forem inválidas
      */
     public Usuarios login(String email, String senhaTextoClaro) throws Exception {
         if (email == null || senhaTextoClaro == null) return null;
@@ -87,24 +89,23 @@ public class UsuarioService {
     }
 
     // -------------------------------------------------------------------------
-    // Alteração de senha
+    // Alteração de Senha
     // -------------------------------------------------------------------------
 
     /**
-     * Altera a senha de um usuário após validar a senha atual.
+     * Altera a senha de um utilizador após validar a senha atual.
      *
      * @return true se a senha foi alterada com sucesso
      */
-    public boolean alterarSenha(int idUsuario, String senhaAtual, String novaSenha)
-            throws Exception {
+    public boolean alterarSenha(int idUsuario, String senhaAtual, String novaSenha) throws Exception {
 
         if (novaSenha == null || novaSenha.length() < 4)
-            throw new IllegalArgumentException("Nova senha deve ter no mínimo 4 caracteres.");
+            throw new IllegalArgumentException("A nova senha deve ter no mínimo 4 caracteres.");
 
         Usuarios usuario = usuarioDAO.buscarUsuario(idUsuario);
         if (usuario == null) return false;
 
-        // Valida senha atual
+        // Valida a senha atual
         String senhaAtualXor = xorCriptografar(senhaAtual, gerarChave(usuario.getEmail()));
         if (!senhaAtualXor.equals(usuario.getSenhaXor())) {
             return false; // senha atual incorreta
@@ -116,32 +117,27 @@ public class UsuarioService {
     }
 
     // -------------------------------------------------------------------------
-    // XOR — implementação manual conforme exigido pelo enunciado
+    // XOR — implementação manual (Requisito do Enunciado)
     // -------------------------------------------------------------------------
 
     /**
      * Aplica criptografia XOR entre o texto e a chave.
      * A operação é simétrica: xorCriptografar(xorCriptografar(texto, chave), chave) == texto.
-     *
-     * Algoritmo:
-     *   Para cada caractere i do texto:
-     *     resultado[i] = texto[i] XOR chave[i % chave.length]
-     *   O resultado é convertido para Base64 para ser armazenável como String UTF-8.
      */
     public static String xorCriptografar(String texto, String chave) {
         if (texto == null || texto.isEmpty()) return "";
         if (chave == null || chave.isEmpty()) return texto;
 
-        byte[] textoBytes = texto.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        byte[] chaveBytes = chave.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] textoBytes = texto.getBytes(StandardCharsets.UTF_8);
+        byte[] chaveBytes = chave.getBytes(StandardCharsets.UTF_8);
         byte[] resultado  = new byte[textoBytes.length];
 
         for (int i = 0; i < textoBytes.length; i++) {
             resultado[i] = (byte) (textoBytes[i] ^ chaveBytes[i % chaveBytes.length]);
         }
 
-        // Converte para Base64 para que o resultado seja uma String válida e armazenável
-        return java.util.Base64.getEncoder().encodeToString(resultado);
+        // Converte para Base64 para que o resultado seja uma String válida e armazenável em UTF-8
+        return Base64.getEncoder().encodeToString(resultado);
     }
 
     /**
@@ -152,27 +148,26 @@ public class UsuarioService {
         if (textoCriptografado == null || textoCriptografado.isEmpty()) return "";
         if (chave == null || chave.isEmpty()) return textoCriptografado;
 
-        byte[] criptBytes = java.util.Base64.getDecoder().decode(textoCriptografado);
-        byte[] chaveBytes = chave.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] criptBytes = Base64.getDecoder().decode(textoCriptografado);
+        byte[] chaveBytes = chave.getBytes(StandardCharsets.UTF_8);
         byte[] resultado  = new byte[criptBytes.length];
 
         for (int i = 0; i < criptBytes.length; i++) {
             resultado[i] = (byte) (criptBytes[i] ^ chaveBytes[i % chaveBytes.length]);
         }
 
-        return new String(resultado, java.nio.charset.StandardCharsets.UTF_8);
+        return new String(resultado, StandardCharsets.UTF_8);
     }
 
     // -------------------------------------------------------------------------
-    // Geração de chave — combina email + chave base
+    // Utilitários Internos
     // -------------------------------------------------------------------------
 
     /**
-     * Gera a chave XOR derivada do email do usuário.
+     * Gera a chave XOR derivada do email do utilizador.
      * Combinar com CHAVE_BASE garante que a chave tenha comprimento mínimo adequado.
      */
     private static String gerarChave(String email) {
-        // Concatena email com chave base para aumentar a entropia
         return email + CHAVE_BASE;
     }
 }

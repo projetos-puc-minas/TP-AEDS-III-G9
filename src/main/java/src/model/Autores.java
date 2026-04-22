@@ -11,12 +11,13 @@ import src.util.Registro;
 import src.util.SerializadorUtil;
 
 /**
- * CORREÇÃO: serialização migrada de writeUTF/readUTF para SerializadorUtil
- * (delimitador ';'), alinhando com todos os outros modelos do projeto e com
- * o esquema binário documentado.
- *
- * dataNascimento é armazenado como timestamp Unix em milissegundos (long, 8 bytes).
- * Use DataUtil.stringToTimestamp() e DataUtil.timestampToString() para conversão.
+ * Modelo de Autor.
+ * * Representa os autores dos livros no sistema.
+ * * A data de nascimento é armazenada como um timestamp Unix em milissegundos (long, 8 bytes)
+ * para garantir precisão e segurança contra problemas de fuso horário, sendo formatada
+ * na leitura através do utilitário DataUtil.
+ * * A serialização de Strings (nome, biografia) é gerida de forma segura
+ * através do SerializadorUtil, utilizando o delimitador ';'.
  */
 public class Autores implements Registro {
 
@@ -24,49 +25,63 @@ public class Autores implements Registro {
     private int     tamRegistro;
     private int     id;
     private String  nome;
-    private long    dataNascimento; // timestamp Unix em milissegundos
+    private long    dataNascimento; // Armazenado como timestamp Unix em milissegundos
     private String  biografia;
 
-    // --- Construtores ---
+    // -------------------------------------------------------------------------
+    // Construtores
+    // -------------------------------------------------------------------------
 
     public Autores() {
         this(-1, "", 0L, "");
     }
 
-    public Autores(int id, String nome, long dataNascimento, String biografia) {
-        this.lapide          = true;
-        this.id              = id;
-        this.nome            = nome;
-        this.dataNascimento  = dataNascimento;
-        this.biografia       = biografia;
+    public Autores(String nome, long dataNascimento, String biografia) {
+        this(-1, nome, dataNascimento, biografia);
     }
 
-    // --- Registro ---
+    public Autores(int id, String nome, long dataNascimento, String biografia) {
+        this.lapide         = true;
+        this.id             = id;
+        this.nome           = nome;
+        this.dataNascimento = dataNascimento;
+        this.biografia      = biografia;
+    }
+
+    // -------------------------------------------------------------------------
+    // Implementação da Interface Registro
+    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
+
     @Override public void    setTamRegistro(int tam)   { this.tamRegistro = tam; }
     @Override public int     getTamRegistro()          { return this.tamRegistro; }
+
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // --- Getters / Setters ---
+    // -------------------------------------------------------------------------
+    // Getters e Setters
+    // -------------------------------------------------------------------------
 
-    public String getNome()                         { return nome; }
-    public void   setNome(String nome)              { this.nome = nome; }
+    public String getNome()                            { return nome; }
+    public void   setNome(String nome)                 { this.nome = nome; }
 
-    public long   getDataNascimento()               { return dataNascimento; }
-    public void   setDataNascimento(long ts)        { this.dataNascimento = ts; }
+    public long   getDataNascimento()                  { return dataNascimento; }
+    public void   setDataNascimento(long timestamp)    { this.dataNascimento = timestamp; }
 
-    /** Retorna a data de nascimento no formato dd/MM/yyyy. */
+    /** Retorna a data de nascimento já formatada em dd/MM/yyyy utilizando o DataUtil. */
     public String getDataNascimentoFormatada() {
         return DataUtil.timestampToString(dataNascimento);
     }
 
-    public String getBiografia()                    { return biografia; }
-    public void   setBiografia(String biografia)    { this.biografia = biografia; }
+    public String getBiografia()                       { return biografia; }
+    public void   setBiografia(String biografia)       { this.biografia = biografia; }
 
-    // --- Serialização (padrão único do projeto: delimitador ';') ---
+    // -------------------------------------------------------------------------
+    // Serialização (Padrão do Projeto)
+    // -------------------------------------------------------------------------
 
     @Override
     public byte[] toByteArray() throws IOException {
@@ -92,11 +107,15 @@ public class Autores implements Registro {
         this.biografia      = SerializadorUtil.readString(dis);
     }
 
+    // -------------------------------------------------------------------------
+    // Impressão Formatada
+    // -------------------------------------------------------------------------
+
     @Override
     public String toString() {
-        return "\nID................: " + id
-             + "\nNome..............: " + nome
-             + "\nData de Nascimento: " + getDataNascimentoFormatada()
-             + "\nBiografia.........: " + biografia;
+        return "\nID..................: " + id
+             + "\nNome................: " + nome
+             + "\nData de Nascimento..: " + getDataNascimentoFormatada()
+             + "\nBiografia...........: " + biografia;
     }
 }

@@ -2,56 +2,44 @@ import src.dao.DAOFactory;
 import src.server.ApiServer;
 
 /**
- * Ponto de entrada do sistema BiblioSys.
+ * Classe principal de inicialização do sistema BiblioSys.
  *
- * Inicializa o DAOFactory (que monta todos os DAOs e injeta dependências)
- * e sobe o servidor HTTP na porta 8080.
- *
- * Tabelas ativas:
- *   - Editora     (1:N com Livro)
- *   - Livro       (possui campo multivalorado: generos[])
- *   - Autores
- *   - LivroAutor  (N:N entre Livro e Autores)
- *   - Usuarios    (autenticação XOR)
- *
- * Acesse: http://localhost:8080
- *
- * Dependência necessária (coloque no classpath):
- *   org.json — https://mvnrepository.com/artifact/org.json/json
+ * Responsável por instanciar a DAOFactory e iniciar o servidor HTTP.
+ * Requer a biblioteca org.json no classpath.
  */
 public class Main {
 
     private static final int    PORT     = 8080;
-    private static final String WEB_ROOT = "./web"; // pasta com index.html, style.css, app.js
+    private static final String WEB_ROOT = "./web";
 
     public static void main(String[] args) {
-        System.out.println("╔══════════════════════════════╗");
-        System.out.println("║  BiblioSys — AEDs III · G9   ║");
-        System.out.println("╚══════════════════════════════╝");
-
-        DAOFactory factory = null;
+        System.out.println("BiblioSys - Inicializando o sistema...");
 
         try {
-            System.out.print("→ Inicializando DAOs... ");
-            factory = new DAOFactory();
-            System.out.println("OK");
+            DAOFactory factory = new DAOFactory();
+            System.out.println("DAOFactory inicializada com sucesso.");
 
-            System.out.print("→ Subindo servidor HTTP na porta " + PORT + "... ");
             ApiServer server = new ApiServer(PORT, factory, WEB_ROOT);
             server.start();
-            System.out.println("OK");
 
-            System.out.println("\nAcesse: http://localhost:" + PORT);
-            System.out.println("Pressione ENTER para encerrar.\n");
+            // Hook de encerramento para garantir fechamento adequado de recursos (Fase 4).
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("\nEncerrando processos do BiblioSys...");
+                System.out.println("Sistema encerrado.");
+            }));
+
+            System.out.println("Servidor ativo: http://localhost:" + PORT);
+            System.out.println("Pressione [ENTER] no terminal para interromper a execucao.");
 
             System.in.read();
 
-        } catch (Exception e) {
-            System.err.println("\n[ERRO FATAL] " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            System.out.println("→ Encerrando...");
+            System.out.println("Interrupcao solicitada pelo usuario.");
             System.exit(0);
+
+        } catch (Exception e) {
+            System.err.println("Erro fatal durante a inicializacao do sistema:");
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 }

@@ -1,5 +1,8 @@
 package src.dao;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,25 +10,30 @@ import src.model.Autores;
 import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
+import src.util.HashExtensivel;
 
 /**
  * DAO de Autores.
  *
- * Índice B+: chave = id, valor = offset físico no autores.bin.
+ * * Índice B+: chave = id, valor = offset físico no autores.bin.
  *
  * INTEGRIDADE REFERENCIAL:
- *   excluirAutor() rejeita a exclusão se houver vínculos na tabela
- *   livros_autores (verificado via LivroAutorDAO).
+ * - O método excluirAutor() rejeita a exclusão se houver vínculos na
+ * tabela intermédia livros_autores (verificado via LivroAutorDAO).
  */
 public class AutoresDAO {
 
     private final Arquivo<Autores> arqAutores;
-    private final ArvoreBMais      indice;
-    private LivroAutorDAO          livroAutorDAO; // injetado
+    private final ArvoreBMais      indice;   // B+: listagem ordenada
+    private final HashExtensivel   hash;     // Hash: busca direta
+    
+    // Dependência injetada para garantir a integridade do N:N
+    private LivroAutorDAO livroAutorDAO;
 
     public AutoresDAO() throws Exception {
         arqAutores = new Arquivo<>("autores", Autores.class.getConstructor());
         indice     = new ArvoreBMais("autores_id");
+        hash       = new HashExtensivel("autores_id");
     }
 
     public void setLivroAutorDAO(LivroAutorDAO livroAutorDAO) {
@@ -40,6 +48,7 @@ public class AutoresDAO {
         CreateResult cr = arqAutores.create(autor);
         if (cr.id > 0) {
             indice.inserir(cr.id, cr.endereco);
+            hash.inserir(cr.id, cr.endereco);
         }
         return cr.id;
     }
@@ -49,7 +58,7 @@ public class AutoresDAO {
     // -------------------------------------------------------------------------
 
     public Autores buscarAutor(int id) throws Exception {
-        long offset = indice.buscar(id);
+        long offset = hash.buscar(id); // Hash: O(1) amortizado
         if (offset != ArvoreBMais.NULO) {
             return arqAutores.readByOffset(offset);
         }
@@ -66,41 +75,47 @@ public class AutoresDAO {
 
     public boolean alterarAutor(Autores autor) throws Exception {
         boolean ok = arqAutores.update(autor);
-        if (ok) reindexar(autor.getId());
+        if (ok) {
+            reindexar(autor.getId());
+        }
         return ok;
     }
 
     // -------------------------------------------------------------------------
-    // DELETE — com integridade referencial
+    // DELETE (com Integridade Referencial)
     // -------------------------------------------------------------------------
 
     /**
-     * Exclui um autor.
-     * Lança IllegalStateException se houver livros vinculados a ele.
+     * Exclui um autor de forma lógica e atualiza o índice.
+     * Lança IllegalStateException se o autor possuir livros vinculados.
      */
     public boolean excluirAutor(int id) throws Exception {
-        if (livroAutorDAO != null) {
-            List<?> vinculos = livroAutorDAO.buscarAutoresDoLivro(id);
-            // buscarLivrosDoAutor é o método correto aqui
-            List<?> livros = livroAutorDAO.buscarLivrosDoAutor(id);
-            if (!livros.isEmpty()) {
-                throw new IllegalStateException(
-                    "Não é possível excluir o autor ID " + id +
-                    " pois há " + livros.size() + " livro(s) vinculado(s). " +
-                    "Remova os vínculos antes de excluir o autor.");
-            }
+        if (livroAutorDAO != null && !livroAutorDAO.buscarLivrosDoAutor(id).isEmpty()) {
+            throw new IllegalStateException(
+                "Não é possível excluir o Autor ID " + id + 
+                " pois existem livros vinculados a ele na tabela livros_autores.");
         }
+
         boolean ok = arqAutores.delete(id);
-        if (ok) indice.remover(id);
+        if (ok) {
+            indice.remover(id);
+            hash.remover(id);
+        }
         return ok;
     }
 
     // -------------------------------------------------------------------------
-    // LISTAGEM ORDENADA
+    // LISTAGEM ORDENADA (via B+)
     // -------------------------------------------------------------------------
 
     public List<Autores> listarOrdenadoPorId() throws Exception {
-        long[][] pares   = indice.listarOrdenado();
+        long[][] pares = indice.listarOrdenado();
+        if (pares.length == 0 && arqAutores.getTotalRegistros() > 0) {
+            for (Arquivo.OffsetEntry<Autores> e : arqAutores.listarComOffset()) {
+                indice.inserir(e.objeto.getId(), e.offset);
+            }
+            pares = indice.listarOrdenado();
+        }
         List<Autores> res = new ArrayList<>();
         for (long[] par : pares) {
             Autores a = arqAutores.readByOffset(par[1]);
@@ -110,25 +125,38 @@ public class AutoresDAO {
     }
 
     // -------------------------------------------------------------------------
-    // Auxiliar
+    // Auxiliar (Otimizado)
     // -------------------------------------------------------------------------
 
+    /**
+     * Varre o ficheiro para encontrar o novo offset físico após um update.
+     * Salta blocos excluídos (lápide falsa) sem os carregar para a memória RAM.
+     */
     private void reindexar(int id) throws Exception {
-        try (java.io.RandomAccessFile raf =
-                new java.io.RandomAccessFile("./data/autores.bin", "r")) {
+        try (RandomAccessFile raf = new RandomAccessFile("./data/autores.bin", "r")) {
             raf.seek(Arquivo.TAM_CABECALHO);
+            
             while (raf.getFilePointer() < raf.length()) {
-                long    pos    = raf.getFilePointer();
-                boolean lapide = raf.readBoolean();
-                int     tam    = raf.readInt();
-                byte[]  dados  = new byte[tam];
-                raf.readFully(dados);
+                long    pos       = raf.getFilePointer();
+                boolean lapide    = raf.readBoolean();
+                int     tamFisico = raf.readInt();
+                
                 if (lapide) {
-                    java.io.DataInputStream dis =
-                        new java.io.DataInputStream(
-                            new java.io.ByteArrayInputStream(dados));
-                    int rid = dis.readInt();
-                    if (rid == id) { indice.atualizar(id, pos); return; }
+                    byte[] dados = new byte[tamFisico];
+                    raf.readFully(dados);
+                    
+                    ByteArrayInputStream bais = new ByteArrayInputStream(dados);
+                    DataInputStream      dis  = new DataInputStream(bais);
+                    
+                    int idLido = dis.readInt();
+                    
+                    if (idLido == id) {
+                        indice.atualizar(id, pos);
+                        hash.atualizar(id, pos);
+                        return;
+                    }
+                } else {
+                    raf.skipBytes(tamFisico); // Otimização de I/O e RAM
                 }
             }
         }

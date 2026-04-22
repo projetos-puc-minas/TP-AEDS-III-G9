@@ -2,37 +2,13 @@ package src.util;
 
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-/**
- * Árvore B+ persistida em arquivo .idx.
- *
- * Mapeamento: chave (int) → endereço físico no .bin (long).
- *
- * CORREÇÕES em relação à versão anterior:
- *   1. O segundo parâmetro de inserir() é o offset real no .bin, não o id.
- *      Os DAOs devem passar o endereço retornado por Arquivo.create().
- *   2. Tamanho do nó calculado de forma consistente com o que lerNo/gravarNo
- *      efetivamente lê e escreve — evita desalinhamento após TAM_CABECALHO.
- *   3. Remoção sem rebalanceamento é documentada como limitação conhecida
- *      (underflow não tratado). Para a fase atual isso é aceitável; nas
- *      fases posteriores deve ser implementada fusão/redistribuição.
- *
- * Estrutura do arquivo .idx:
- *   Cabeçalho (32 bytes):
- *     [0..7]   long  posição da raiz  (-1 = árvore vazia)
- *     [8..15]  long  total de chaves
- *     [16..31] reservado
- *   Nós (tamanho fixo TAM_NO bytes cada):
- *     [0]      boolean  folha
- *     [1..4]   int      qtdChaves
- *     para cada i in [0, ORDEM):
- *       [+4]   int      chaves[i]
- *       [+8]   long     ptrs[i]
- *     [último] long     ptrs[ORDEM] ou ptrProximo (folhas)
- */
 public class ArvoreBMais implements Indexador {
 
-    public  static final int  ORDEM        = 4;
+    public  static final int  ORDEM         = 4;
     private static final int  TAM_CABECALHO = 32;
     public  static final long NULO          = -1L;
 
@@ -123,10 +99,6 @@ public class ArvoreBMais implements Indexador {
         return atualizarNaFolha(raiz, chave, novoEndereco);
     }
 
-    /**
-     * Retorna todos os pares [chave, endereço] em ordem crescente,
-     * percorrendo as folhas da esquerda para a direita.
-     */
     @Override
     public long[][] listarOrdenado() throws Exception {
         long raiz = getRaiz();
@@ -140,7 +112,7 @@ public class ArvoreBMais implements Indexador {
             no  = lerNo(ptr);
         }
 
-        java.util.List<long[]> lista = new java.util.ArrayList<>();
+        List<long[]> lista = new ArrayList<>();
         while (ptr != NULO) {
             no = lerNo(ptr);
             for (int i = 0; i < no.qtdChaves; i++) {
@@ -152,6 +124,22 @@ public class ArvoreBMais implements Indexador {
         }
 
         return lista.toArray(new long[0][0]);
+    }
+
+    /**
+     * Retorna todos os pares [chave, endereco] em ordem DECRESCENTE de chave.
+     * Realizado por travessia das folhas da B+ (esquerda→direita) seguida de
+     * inversão da lista — mantém a semântica de "travessia da Árvore B+".
+     */
+    public long[][] listarOrdenadoDecrescente() throws Exception {
+        long[][] crescente = listarOrdenado();
+        // Inverte o array mantendo a origem como travessia da B+
+        int n = crescente.length;
+        long[][] decrescente = new long[n][2];
+        for (int i = 0; i < n; i++) {
+            decrescente[i] = crescente[n - 1 - i];
+        }
+        return decrescente;
     }
 
     @Override
@@ -169,8 +157,7 @@ public class ArvoreBMais implements Indexador {
     // Inserção recursiva
     // -------------------------------------------------------------------------
 
-    private ResultadoInsercao inserirRecursivo(long posNo, int chave, long endereco)
-            throws Exception {
+    private ResultadoInsercao inserirRecursivo(long posNo, int chave, long endereco) throws Exception {
         No no = lerNo(posNo);
 
         if (no.folha) return inserirNaFolha(posNo, no, chave, endereco);
@@ -184,8 +171,7 @@ public class ArvoreBMais implements Indexador {
         return inserirEmInterno(posNo, no, promovido.chavePromovida, promovido.novoFilho);
     }
 
-    private ResultadoInsercao inserirNaFolha(long posNo, No no, int chave, long endereco)
-            throws Exception {
+    private ResultadoInsercao inserirNaFolha(long posNo, No no, int chave, long endereco) throws Exception {
         if (no.qtdChaves < ORDEM) {
             // Espaço disponível — insere mantendo ordem
             int i = no.qtdChaves - 1;
@@ -248,8 +234,7 @@ public class ArvoreBMais implements Indexador {
         return res;
     }
 
-    private ResultadoInsercao inserirEmInterno(long posNo, No no, int chave, long filhoDir)
-            throws Exception {
+    private ResultadoInsercao inserirEmInterno(long posNo, No no, int chave, long filhoDir) throws Exception {
         if (no.qtdChaves < ORDEM) {
             int i = no.qtdChaves - 1;
             while (i >= 0 && chave < no.chaves[i]) {
@@ -352,8 +337,7 @@ public class ArvoreBMais implements Indexador {
     // Atualização
     // -------------------------------------------------------------------------
 
-    private boolean atualizarNaFolha(long posNo, int chave, long novoEndereco)
-            throws Exception {
+    private boolean atualizarNaFolha(long posNo, int chave, long novoEndereco) throws Exception {
         No no = lerNo(posNo);
 
         if (no.folha) {
@@ -441,7 +425,7 @@ public class ArvoreBMais implements Indexador {
 
         No(boolean folha) {
             this.folha = folha;
-            java.util.Arrays.fill(ptrs, NULO);
+            Arrays.fill(ptrs, NULO);
         }
     }
 

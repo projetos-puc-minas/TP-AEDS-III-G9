@@ -1,25 +1,34 @@
 package src.dao;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.RandomAccessFile;
 import java.util.List;
 
 import src.model.Usuarios;
 import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
+import src.util.HashExtensivel;
 
 /**
- * DAO de Usuários.
+ * DAO de Utilizadores.
  *
- * Índice B+: chave = id, valor = offset físico no usuarios.bin.
+ * * Índice Primário (B+): chave = id, valor = offset físico no usuarios.bin.
+ * * A busca por email (necessária para o login) é feita via varrimento
+ * sequencial (linear scan), uma vez que não existe índice secundário
+ * dedicado a este campo textual.
  */
 public class UsuarioDAO {
 
     private final Arquivo<Usuarios> arqUsuarios;
-    private final ArvoreBMais       indice;
+    private final ArvoreBMais       indice;   // B+: listagem ordenada
+    private final HashExtensivel    hash;     // Hash: busca direta
 
     public UsuarioDAO() throws Exception {
         arqUsuarios = new Arquivo<>("usuarios", Usuarios.class.getConstructor());
         indice      = new ArvoreBMais("usuarios_id");
+        hash        = new HashExtensivel("usuarios_id");
     }
 
     // -------------------------------------------------------------------------
@@ -28,7 +37,10 @@ public class UsuarioDAO {
 
     public int incluirUsuario(Usuarios usuario) throws Exception {
         CreateResult cr = arqUsuarios.create(usuario);
-        if (cr.id > 0) indice.inserir(cr.id, cr.endereco);
+        if (cr.id > 0) {
+            indice.inserir(cr.id, cr.endereco);
+            hash.inserir(cr.id, cr.endereco);
+        }
         return cr.id;
     }
 
@@ -37,18 +49,22 @@ public class UsuarioDAO {
     // -------------------------------------------------------------------------
 
     public Usuarios buscarUsuario(int id) throws Exception {
-        long offset = indice.buscar(id);
-        if (offset != ArvoreBMais.NULO) return arqUsuarios.readByOffset(offset);
-        return arqUsuarios.read(id);
+        long offset = hash.buscar(id); // Hash: O(1) amortizado
+        if (offset != ArvoreBMais.NULO) {
+            return arqUsuarios.readByOffset(offset);
+        }
+        return arqUsuarios.read(id); // Fallback de segurança (scan)
     }
 
     /**
-     * Busca usuário pelo email — necessário para o fluxo de login.
-     * Scan linear (email sem índice dedicado).
+     * Busca um utilizador pelo email — essencial para o fluxo de login.
+     * Como não temos um Hash ou B+ para o email, fazemos um scan sequencial.
      */
     public Usuarios buscarPorEmail(String email) throws Exception {
         for (Usuarios u : arqUsuarios.listarTodos()) {
-            if (u.getEmail().equalsIgnoreCase(email)) return u;
+            if (u.getEmail().equalsIgnoreCase(email.trim())) {
+                return u;
+            }
         }
         return null;
     }
@@ -63,7 +79,11 @@ public class UsuarioDAO {
 
     public boolean alterarUsuario(Usuarios usuario) throws Exception {
         boolean ok = arqUsuarios.update(usuario);
-        if (ok) reindexar(usuario.getId());
+        if (ok) {
+            // Se o update precisou de mover o registo de sítio (não coube no bloco),
+            // o offset mudou. Temos de atualizar o índice B+.
+            reindexar(usuario.getId());
+        }
         return ok;
     }
 
@@ -73,30 +93,50 @@ public class UsuarioDAO {
 
     public boolean excluirUsuario(int id) throws Exception {
         boolean ok = arqUsuarios.delete(id);
-        if (ok) indice.remover(id);
+        if (ok) {
+            indice.remover(id);
+            hash.remover(id);
+        }
         return ok;
     }
 
     // -------------------------------------------------------------------------
-    // Auxiliar
+    // Auxiliar (Reindexação Rápida)
     // -------------------------------------------------------------------------
 
+    /**
+     * Varre o ficheiro binário para encontrar o novo offset físico de um registo
+     * e atualiza o índice B+. Utilizado após um update estrutural.
+     */
     private void reindexar(int id) throws Exception {
-        try (java.io.RandomAccessFile raf =
-                new java.io.RandomAccessFile("./data/usuarios.bin", "r")) {
+        try (RandomAccessFile raf = new RandomAccessFile("./data/usuarios.bin", "r")) {
             raf.seek(Arquivo.TAM_CABECALHO);
+            
             while (raf.getFilePointer() < raf.length()) {
-                long    pos    = raf.getFilePointer();
-                boolean lapide = raf.readBoolean();
-                int     tam    = raf.readInt();
-                byte[]  dados  = new byte[tam];
-                raf.readFully(dados);
+                long    pos       = raf.getFilePointer();
+                boolean lapide    = raf.readBoolean();
+                int     tamFisico = raf.readInt();
+                
                 if (lapide) {
-                    java.io.DataInputStream dis =
-                        new java.io.DataInputStream(
-                            new java.io.ByteArrayInputStream(dados));
-                    int rid = dis.readInt();
-                    if (rid == id) { indice.atualizar(id, pos); return; }
+                    byte[] dados = new byte[tamFisico];
+                    raf.readFully(dados);
+                    
+                    // O 'id' é sempre o primeiro int serializado no toByteArray().
+                    // Lemos apenas o início do array para descobrir se é o alvo.
+                    ByteArrayInputStream bais = new ByteArrayInputStream(dados);
+                    DataInputStream      dis  = new DataInputStream(bais);
+                    
+                    int idLido = dis.readInt();
+                    
+                    if (idLido == id) {
+                        indice.atualizar(id, pos);
+                        hash.atualizar(id, pos);
+                        return;
+                    }
+                } else {
+                    // Otimização: se o registo estiver excluído, saltamos os bytes
+                    // sem os carregar para a memória RAM.
+                    raf.skipBytes(tamFisico);
                 }
             }
         }

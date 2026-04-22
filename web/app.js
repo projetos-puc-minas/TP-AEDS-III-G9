@@ -591,7 +591,6 @@ async function saveLivro() {
   if (!titulo)    throw new Error('Título é obrigatório.');
   if (!idEditora) throw new Error('Selecione uma editora.');
 
-  // FIX: inclui generos no body (era o bug que causava o update apagar o livro)
   const body = {
     titulo,
     idEditora,
@@ -607,25 +606,25 @@ async function saveLivro() {
   if (state.editId) {
     await put('/api/livros/' + state.editId, body);
   } else {
-    await post('/api/livros', body);
-    // Busca o id do livro recém criado pelo título
-    const lista = await get('/api/livros');
-    const novo  = lista.slice().reverse().find(l => l.titulo === titulo);
-    livroId = novo ? novo.id : null;
+    // O POST retorna {"ok":true,"id":N} — usamos o ID direto, sem busca por título
+    const res = await post('/api/livros', body);
+    livroId = res.id || null;
   }
 
-  // Sincronizar autores
+  // Sincronizar autores (N:N)
   if (livroId) {
-    const selectedIds  = [...document.querySelectorAll('.autor-chip.selected')]
-                          .map(c => Number(c.dataset.autorId));
-    const currentRels  = state.livrosAutores.filter(la => la.idLivro === livroId);
-    const currentIds   = currentRels.map(la => la.idAutor);
+    const selectedIds = [...document.querySelectorAll('.autor-chip.selected')]
+                         .map(c => Number(c.dataset.autorId));
+    const currentRels = state.livrosAutores.filter(la => la.idLivro === livroId);
+    const currentIds  = currentRels.map(la => la.idAutor);
 
+    // Remove vínculos desmarcados
     for (const la of currentRels) {
       if (!selectedIds.includes(la.idAutor)) {
         await del('/api/livros-autores/' + la.id).catch(() => {});
       }
     }
+    // Adiciona novos vínculos
     for (const aid of selectedIds) {
       if (!currentIds.includes(aid)) {
         await post('/api/livros-autores', { idLivro: livroId, idAutor: aid }).catch(() => {});

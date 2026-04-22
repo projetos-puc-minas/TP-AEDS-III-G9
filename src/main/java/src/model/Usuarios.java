@@ -10,12 +10,11 @@ import src.util.Registro;
 import src.util.SerializadorUtil;
 
 /**
- * CORREÇÃO: serialização migrada de writeUTF/readUTF para SerializadorUtil
- * (delimitador ';'), alinhando com todos os outros modelos e com o esquema
- * binário documentado.
- *
- * A senha é armazenada já criptografada via XOR (processada em UsuarioService
- * antes de ser atribuída ao campo senhaXor).
+ * Modelo de Utilizador do sistema.
+ * * A senha é armazenada de forma segura utilizando criptografia XOR,
+ * processada pela camada de serviço antes de chegar ao modelo.
+ * * Utiliza o SerializadorUtil com delimitador ';' para garantir a leitura exata
+ * dos dados, mesmo em blocos de tamanho variável.
  */
 public class Usuarios implements Registro {
 
@@ -24,9 +23,11 @@ public class Usuarios implements Registro {
     private int     id;
     private String  nome;
     private String  email;
-    private String  senhaXor; // armazenada criptografada
+    private String  senhaXor; // Armazenada criptografada em Base64
 
-    // --- Construtores ---
+    // -------------------------------------------------------------------------
+    // Construtores
+    // -------------------------------------------------------------------------
 
     public Usuarios() {
         this(-1, "", "", "");
@@ -44,16 +45,22 @@ public class Usuarios implements Registro {
         this.senhaXor = senhaXor;
     }
 
-    // --- Registro ---
+    // -------------------------------------------------------------------------
+    // Implementação da Interface Registro
+    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
+
     @Override public void    setTamRegistro(int tam)   { this.tamRegistro = tam; }
     @Override public int     getTamRegistro()          { return this.tamRegistro; }
+
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // --- Getters / Setters ---
+    // -------------------------------------------------------------------------
+    // Getters e Setters
+    // -------------------------------------------------------------------------
 
     public String getNome()                     { return nome; }
     public void   setNome(String nome)          { this.nome = nome; }
@@ -64,7 +71,9 @@ public class Usuarios implements Registro {
     public String getSenhaXor()                 { return senhaXor; }
     public void   setSenhaXor(String senhaXor)  { this.senhaXor = senhaXor; }
 
-    // --- Serialização ---
+    // -------------------------------------------------------------------------
+    // Serialização (Padrão Único do Projeto)
+    // -------------------------------------------------------------------------
 
     @Override
     public byte[] toByteArray() throws IOException {

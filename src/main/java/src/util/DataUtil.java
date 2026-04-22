@@ -8,33 +8,32 @@ import java.time.format.DateTimeParseException;
 
 /**
  * Utilitário de conversão de datas.
- *
- * Usa java.time (imutável e thread-safe) em vez de SimpleDateFormat.
- * Armazenamento: timestamp Unix em milissegundos (long), compatível com
- * o campo dataNascimento de Autores.
+ * Armazena as datas como timestamp Unix em milissegundos (long).
+ * Utiliza a API moderna java.time (imutável e thread-safe).
  */
-public class DataUtil {
+public final class DataUtil {
 
-    // DateTimeFormatter é imutável e thread-safe
-    private static final DateTimeFormatter FORMATO_BR =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter FORMATO_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    // Construtor privado para evitar instanciação de classe utilitária
+    private DataUtil() {}
 
     /**
-     * Converte "dd/MM/yyyy" → timestamp Unix em milissegundos.
+     * Converte uma string no formato "dd/MM/yyyy" para timestamp (long).
      */
-    public static long stringToTimestamp(String data) throws Exception {
+    public static long stringToTimestamp(String data) throws IllegalArgumentException {
         try {
             LocalDate date = LocalDate.parse(data, FORMATO_BR);
             return date.atStartOfDay(ZoneId.systemDefault())
                        .toInstant()
                        .toEpochMilli();
         } catch (DateTimeParseException e) {
-            throw new Exception("Formato de data inválido. Use dd/MM/yyyy");
+            throw new IllegalArgumentException("Formato de data inválido. Use dd/MM/yyyy");
         }
     }
 
     /**
-     * Converte timestamp Unix em milissegundos → "dd/MM/yyyy".
+     * Converte um timestamp (long) de volta para uma String no formato "dd/MM/yyyy".
      */
     public static String timestampToString(long timestamp) {
         return Instant.ofEpochMilli(timestamp)

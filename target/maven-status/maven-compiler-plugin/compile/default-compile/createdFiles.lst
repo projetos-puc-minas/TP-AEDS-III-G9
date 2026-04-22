@@ -16,6 +16,7 @@ src\dao\AutoresDAO.class
 src\server\ApiServer$UsuariosHandler.class
 src\model\Editora.class
 src\dao\UsuarioDAO.class
+src\util\Arquivo$OffsetEntry.class
 src\server\ApiServer$AutoresHandler.class
 src\server\ApiServer$LivrosHandler.class
 src\util\Arquivo$CreateResult.class
@@ -23,8 +24,10 @@ src\dao\EditoraDAO.class
 src\dao\LivroDAO.class
 src\util\DataUtil.class
 src\dao\DAOFactory.class
+src\util\HashExtensivel.class
 src\util\ArvoreBMais$No.class
 src\model\Autores.class
 src\server\ApiServer$EditorasHandler.class
 src\util\SerializadorUtil.class
+src\util\OrdenacaoExterna.class
 src\util\ArvoreBMais$ResultadoInsercao.class

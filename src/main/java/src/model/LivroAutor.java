@@ -9,9 +9,9 @@ import java.io.IOException;
 import src.util.Registro;
 
 /**
- * Tabela intermediária do relacionamento N:N entre Livros e Autores.
- * Cada registro representa um vínculo (id_livro, id_autor).
- * Tamanho fixo após serialização: 12 bytes (3 ints).
+ * Modelo da Tabela Intermediária (Relacionamento N:N).
+ * * Vincula um Livro a um Autor através das suas chaves estrangeiras (idLivro e idAutor).
+ * Como contém apenas números inteiros, o seu tamanho após a serialização é fixo (12 bytes de dados).
  */
 public class LivroAutor implements Registro {
 
@@ -21,7 +21,9 @@ public class LivroAutor implements Registro {
     private int     idLivro;
     private int     idAutor;
 
-    // --- Construtores ---
+    // -------------------------------------------------------------------------
+    // Construtores
+    // -------------------------------------------------------------------------
 
     public LivroAutor() {
         this(-1, -1, -1);
@@ -38,16 +40,22 @@ public class LivroAutor implements Registro {
         this.idAutor = idAutor;
     }
 
-    // --- Registro ---
+    // -------------------------------------------------------------------------
+    // Implementação da Interface Registro
+    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
+
     @Override public void    setTamRegistro(int tam)   { this.tamRegistro = tam; }
     @Override public int     getTamRegistro()          { return this.tamRegistro; }
+
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // --- Getters / Setters ---
+    // -------------------------------------------------------------------------
+    // Getters e Setters
+    // -------------------------------------------------------------------------
 
     public int  getIdLivro()               { return idLivro; }
     public void setIdLivro(int idLivro)    { this.idLivro = idLivro; }
@@ -55,15 +63,19 @@ public class LivroAutor implements Registro {
     public int  getIdAutor()               { return idAutor; }
     public void setIdAutor(int idAutor)    { this.idAutor = idAutor; }
 
-    // --- Serialização ---
+    // -------------------------------------------------------------------------
+    // Serialização (Otimizada para Tamanho Fixo)
+    // -------------------------------------------------------------------------
 
     @Override
     public byte[] toByteArray() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream      dos  = new DataOutputStream(baos);
+        
         dos.writeInt(id);
         dos.writeInt(idLivro);
         dos.writeInt(idAutor);
+        
         return baos.toByteArray();
     }
 
@@ -71,6 +83,7 @@ public class LivroAutor implements Registro {
     public void fromByteArray(byte[] b) throws IOException {
         ByteArrayInputStream bais = new ByteArrayInputStream(b);
         DataInputStream      dis  = new DataInputStream(bais);
+        
         this.id      = dis.readInt();
         this.idLivro = dis.readInt();
         this.idAutor = dis.readInt();
@@ -78,8 +91,8 @@ public class LivroAutor implements Registro {
 
     @Override
     public String toString() {
-        return "\nID.........: " + id
-             + "\nID Livro...: " + idLivro
-             + "\nID Autor...: " + idAutor;
+        return "\nVínculo ID..: " + id
+             + "\nID Livro....: " + idLivro
+             + "\nID Autor....: " + idAutor;
     }
 }

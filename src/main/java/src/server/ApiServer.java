@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpServer;
 import src.dao.*;
 import src.model.*;
 import src.service.UsuarioService;
+import src.util.DataUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -15,30 +16,8 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.List;
 import java.util.concurrent.Executors;
 
-/**
- * Servidor HTTP embutido (com.sun.net.httpserver).
- *
- * Rotas estáticas:
- *   GET /              → index.html
- *   GET /style.css     → style.css
- *   GET /app.js        → app.js
- *
- * Rotas da API (JSON):
- *   /api/livros              GET, POST
- *   /api/livros/{id}         GET, PUT, DELETE
- *   /api/autores             GET, POST
- *   /api/autores/{id}        GET, PUT, DELETE
- *   /api/editoras            GET, POST
- *   /api/editoras/{id}       GET, PUT, DELETE
- *   /api/usuarios            GET, POST
- *   /api/usuarios/{id}       GET, PUT, DELETE
- *   /api/auth/login          POST
- *   /api/livros-autores      GET, POST
- *   /api/livros-autores/{id} GET, DELETE
- */
 public class ApiServer {
 
     private final int        port;
@@ -54,150 +33,119 @@ public class ApiServer {
     public void start() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
-        server.createContext("/api/livros",        new LivrosHandler());
+        server.createContext("/api/livros-autores", new LivrosAutoresHandler());
+        server.createContext("/api/livros",         new LivrosHandler());
         server.createContext("/api/autores",        new AutoresHandler());
         server.createContext("/api/editoras",       new EditorasHandler());
         server.createContext("/api/usuarios",       new UsuariosHandler());
         server.createContext("/api/auth",           new AuthHandler());
-        server.createContext("/api/livros-autores", new LivrosAutoresHandler());
-        // Arquivos estáticos — registrado por último
         server.createContext("/",                   new StaticHandler(webRoot));
 
         server.setExecutor(Executors.newFixedThreadPool(8));
         server.start();
-        System.out.println("✓ BiblioSys rodando em http://localhost:" + port);
+        System.out.println("BiblioSys rodando em http://localhost:" + port);
     }
 
-    // =========================================================================
-    // STATIC FILES
-    // =========================================================================
-
+    // --- STATIC FILES ---
     private static class StaticHandler implements HttpHandler {
         private final Path root;
-
-        StaticHandler(String root) {
-            this.root = Path.of(root).toAbsolutePath().normalize();
-        }
+        StaticHandler(String root) { this.root = Path.of(root).toAbsolutePath().normalize(); }
 
         @Override
         public void handle(HttpExchange ex) throws IOException {
-            if ("OPTIONS".equals(ex.getRequestMethod())) {
-                setCorsHeaders(ex);
-                ex.sendResponseHeaders(204, -1);
-                return;
-            }
-
+            if (handleCors(ex)) return;
             String reqPath = ex.getRequestURI().getPath();
             if (reqPath.equals("/")) reqPath = "/index.html";
-
-            // Bloqueia path traversal via canonicalização
             Path target = root.resolve(reqPath.substring(1)).normalize();
-            if (!target.startsWith(root)) {
-                send(ex, 403, "text/plain", "Forbidden");
-                return;
-            }
-
-            File f = target.toFile();
-            if (!f.exists() || f.isDirectory()) {
+            if (!target.startsWith(root) || !Files.exists(target) || Files.isDirectory(target)) {
                 send(ex, 404, "text/plain", "Not found");
                 return;
             }
-
-            String mime = mimeFor(reqPath);
+            String ct = reqPath.endsWith(".js")  ? "application/javascript"
+                      : reqPath.endsWith(".css") ? "text/css"
+                      : "text/html";
             byte[] body = Files.readAllBytes(target);
-            setCorsHeaders(ex);
-            ex.getResponseHeaders().set("Content-Type", mime);
+            ex.getResponseHeaders().set("Content-Type", ct);
             ex.sendResponseHeaders(200, body.length);
             try (OutputStream os = ex.getResponseBody()) { os.write(body); }
         }
-
-        private static String mimeFor(String path) {
-            if (path.endsWith(".html")) return "text/html; charset=utf-8";
-            if (path.endsWith(".css"))  return "text/css; charset=utf-8";
-            if (path.endsWith(".js"))   return "application/javascript; charset=utf-8";
-            if (path.endsWith(".json")) return "application/json; charset=utf-8";
-            if (path.endsWith(".png"))  return "image/png";
-            if (path.endsWith(".svg"))  return "image/svg+xml";
-            return "application/octet-stream";
-        }
     }
 
-    // =========================================================================
-    // LIVROS
-    // =========================================================================
-
+    // --- HANDLER: LIVROS (GET list, GET /:id, POST, PUT /:id, DELETE /:id) ---
     private class LivrosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
             if (handleCors(ex)) return;
             try {
-                LivroDAO dao   = factory.getLivroDAO();
-                String[] parts = ex.getRequestURI().getPath().split("/");
-                boolean hasId  = parts.length >= 4 && !parts[3].isEmpty();
-                int id = hasId ? Integer.parseInt(parts[3]) : -1;
+                LivroDAO dao = factory.getLivroDAO();
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
 
-                switch (ex.getRequestMethod()) {
-                    case "GET": {
-                        if (hasId) {
-                            Livro l = dao.buscarLivroPorId(id);
-                            if (l == null) { send404(ex); return; }
-                            sendJson(ex, 200, livroToJson(l).toString());
-                        } else {
-                            JSONArray arr = new JSONArray();
-                            for (Livro l : dao.listarOrdenadoPorId()) arr.put(livroToJson(l));
-                            sendJson(ex, 200, arr.toString());
-                        }
-                        break;
-                    }
-                    case "POST": {
-                        JSONObject j = readBody(ex);
-                        Livro l = new Livro(
-                            j.getInt("idEditora"),
-                            j.getString("titulo"),
-                            padIsbn(j.optString("isbn", "")),
-                            j.optInt("anoPublicacao", 0),
-                            j.optDouble("preco", 0.0),
-                            j.optString("sinopse", ""),
-                            parseStringArray(j, "generos")
-                        );
-                        boolean ok = dao.incluirLivro(l);
-                        sendJson(ex, ok ? 201 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "PUT": {
-                        JSONObject j = readBody(ex);
+                if ("GET".equals(method)) {
+                    if (id > 0) {
                         Livro l = dao.buscarLivroPorId(id);
                         if (l == null) { send404(ex); return; }
-                        l.setTitulo(j.optString("titulo", l.getTitulo()));
-                        l.setIdEditora(j.optInt("idEditora", l.getIdEditora()));
-                        if (j.has("isbn")) l.setIsbn(padIsbn(j.getString("isbn")));
-                        l.setAnoPublicacao(j.optInt("anoPublicacao", l.getAnoPublicacao()));
-                        l.setPreco(j.optDouble("preco", l.getPreco()));
-                        l.setSinopse(j.optString("sinopse", l.getSinopse()));
-                        if (j.has("generos")) l.setGeneros(parseStringArray(j, "generos"));
-                        boolean ok = dao.alterarLivro(l);
-                        sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "DELETE": {
-                        try {
-                            boolean ok = dao.excluirLivro(id);
-                            sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-                        } catch (IllegalStateException e) {
-                            sendJson(ex, 409, errJson(e.getMessage()));
+                        sendJson(ex, 200, livroToJson(l).toString());
+                    } else {
+                        // ?ordem=titulo  → Ordenação Externa por Intercalação (3d-1)
+                        // ?ordem=id-desc → Decrescente por travessia da Árvore B+  (3d-2)
+                        // (padrão)       → Crescente por travessia da Árvore B+    (3d-2)
+                        String query = ex.getRequestURI().getQuery();
+                        boolean porTitulo  = query != null && query.contains("ordem=titulo");
+                        boolean decrescente = query != null && query.contains("ordem=id-desc");
+                        java.util.List<Livro> lista;
+                        if (porTitulo) {
+                            lista = dao.listarOrdenadoPorTitulo();
+                        } else if (decrescente) {
+                            lista = dao.listarOrdenadoDecrescentePorId();
+                        } else {
+                            lista = dao.listarOrdenadoPorId();
                         }
-                        break;
+                        JSONArray arr = new JSONArray();
+                        for (Livro l : lista) arr.put(livroToJson(l));
+                        sendJson(ex, 200, arr.toString());
                     }
-                    default: ex.sendResponseHeaders(405, -1);
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    Livro novo = new Livro(
+                        j.getInt("idEditora"),
+                        j.getString("titulo"),
+                        padIsbn(j.optString("isbn")),
+                        j.optInt("anoPublicacao"),
+                        j.optDouble("preco"),
+                        j.optString("sinopse"),
+                        parseStringArray(j, "generos")
+                    );
+                    int novoId = dao.incluirLivro(novo);
+                    sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
+                } else if ("PUT".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    Livro existente = dao.buscarLivroPorId(id);
+                    if (existente == null) { send404(ex); return; }
+                    JSONObject j = readBody(ex);
+                    existente.setIdEditora(j.getInt("idEditora"));
+                    existente.setTitulo(j.getString("titulo"));
+                    existente.setIsbn(padIsbn(j.optString("isbn")));
+                    existente.setAnoPublicacao(j.optInt("anoPublicacao"));
+                    existente.setPreco(j.optDouble("preco"));
+                    existente.setSinopse(j.optString("sinopse"));
+                    existente.setGeneros(parseStringArray(j, "generos"));
+                    boolean ok = dao.alterarLivro(existente);
+                    sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    // Cascata: remove vínculos com autores antes de apagar o livro
+                    boolean ok = dao.excluirLivroEmCascata(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
+            } catch (Exception e) { sendError(ex, e); }
         }
 
         private JSONObject livroToJson(Livro l) {
-            JSONArray gens = new JSONArray();
-            if (l.getGeneros() != null) for (String g : l.getGeneros()) gens.put(g);
+            JSONArray generos = new JSONArray();
+            if (l.getGeneros() != null) for (String g : l.getGeneros()) generos.put(g);
             return new JSONObject()
                 .put("id",            l.getId())
                 .put("idEditora",     l.getIdEditora())
@@ -205,413 +153,266 @@ public class ApiServer {
                 .put("isbn",          new String(l.getIsbn()).trim())
                 .put("anoPublicacao", l.getAnoPublicacao())
                 .put("preco",         l.getPreco())
-                .put("sinopse",       l.getSinopse())
-                .put("generos",       gens);
+                .put("sinopse",       l.getSinopse() != null ? l.getSinopse() : "")
+                .put("generos",       generos);
         }
     }
 
-    // =========================================================================
-    // AUTORES
-    // =========================================================================
-
+    // --- HANDLER: AUTORES (GET list, POST, PUT /:id, DELETE /:id) ---
     private class AutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
             if (handleCors(ex)) return;
             try {
                 AutoresDAO dao = factory.getAutoresDAO();
-                String[] parts = ex.getRequestURI().getPath().split("/");
-                boolean hasId  = parts.length >= 4 && !parts[3].isEmpty();
-                int id = hasId ? Integer.parseInt(parts[3]) : -1;
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
 
-                switch (ex.getRequestMethod()) {
-                    case "GET": {
-                        if (hasId) {
-                            Autores a = dao.buscarAutor(id);
-                            if (a == null) { send404(ex); return; }
-                            sendJson(ex, 200, autorToJson(a).toString());
-                        } else {
-                            JSONArray arr = new JSONArray();
-                            for (Autores a : dao.listarOrdenadoPorId()) arr.put(autorToJson(a));
-                            sendJson(ex, 200, arr.toString());
-                        }
-                        break;
-                    }
-                    case "POST": {
-                        JSONObject j = readBody(ex);
-                        long ts = src.util.DataUtil.stringToTimestamp(j.getString("dataNascimento"));
-                        Autores a = new Autores(-1, j.getString("nome"), ts, j.optString("biografia", ""));
-                        int newId = dao.adicionarAutor(a);
-                        sendJson(ex, newId > 0 ? 201 : 500, "{\"id\":" + newId + "}");
-                        break;
-                    }
-                    case "PUT": {
-                        JSONObject j = readBody(ex);
-                        Autores a = dao.buscarAutor(id);
-                        if (a == null) { send404(ex); return; }
-                        a.setNome(j.optString("nome", a.getNome()));
-                        a.setBiografia(j.optString("biografia", a.getBiografia()));
-                        if (j.has("dataNascimento")) {
-                            a.setDataNascimento(src.util.DataUtil.stringToTimestamp(j.getString("dataNascimento")));
-                        }
-                        boolean ok = dao.alterarAutor(a);
-                        sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "DELETE": {
-                        try {
-                            boolean ok = dao.excluirAutor(id);
-                            sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-                        } catch (IllegalStateException e) {
-                            sendJson(ex, 409, errJson(e.getMessage()));
-                        }
-                        break;
-                    }
-                    default: ex.sendResponseHeaders(405, -1);
+                if ("GET".equals(method)) {
+                    JSONArray arr = new JSONArray();
+                    for (Autores a : dao.listarOrdenadoPorId()) arr.put(autorToJson(a));
+                    sendJson(ex, 200, arr.toString());
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    // Front envia dataNascimento como string "dd/MM/yyyy"
+                    long ts = DataUtil.stringToTimestamp(j.getString("dataNascimento"));
+                    dao.adicionarAutor(new Autores(j.getString("nome"), ts, j.optString("biografia")));
+                    sendJson(ex, 201, "{\"ok\":true}");
+                } else if ("PUT".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    Autores existente = dao.buscarAutor(id);
+                    if (existente == null) { send404(ex); return; }
+                    JSONObject j = readBody(ex);
+                    existente.setNome(j.getString("nome"));
+                    existente.setDataNascimento(DataUtil.stringToTimestamp(j.getString("dataNascimento")));
+                    existente.setBiografia(j.optString("biografia"));
+                    boolean ok = dao.alterarAutor(existente);
+                    sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirAutor(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
+            } catch (IllegalStateException e) {
+                sendJson(ex, 409, "{\"erro\":\"" + e.getMessage().replace("\"", "'") + "\"}");
+            } catch (Exception e) { sendError(ex, e); }
         }
 
         private JSONObject autorToJson(Autores a) {
             return new JSONObject()
-                .put("id",                     a.getId())
-                .put("nome",                   a.getNome())
+                .put("id",                      a.getId())
+                .put("nome",                    a.getNome())
                 .put("dataNascimento",          a.getDataNascimento())
                 .put("dataNascimentoFormatada", a.getDataNascimentoFormatada())
-                .put("biografia",              a.getBiografia());
+                .put("biografia",               a.getBiografia() != null ? a.getBiografia() : "");
         }
     }
 
-    // =========================================================================
-    // EDITORAS
-    // =========================================================================
-
+    // --- HANDLER: EDITORAS (GET list, POST, PUT /:id, DELETE /:id) ---
     private class EditorasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
             if (handleCors(ex)) return;
             try {
                 EditoraDAO dao = factory.getEditoraDAO();
-                String[] parts = ex.getRequestURI().getPath().split("/");
-                boolean hasId  = parts.length >= 4 && !parts[3].isEmpty();
-                int id = hasId ? Integer.parseInt(parts[3]) : -1;
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
 
-                switch (ex.getRequestMethod()) {
-                    case "GET": {
-                        if (hasId) {
-                            Editora e = dao.buscarEditoraPorId(id);
-                            if (e == null) { send404(ex); return; }
-                            sendJson(ex, 200, editoraToJson(e).toString());
-                        } else {
-                            JSONArray arr = new JSONArray();
-                            for (Editora e : dao.listarOrdenadoPorId()) arr.put(editoraToJson(e));
-                            sendJson(ex, 200, arr.toString());
-                        }
-                        break;
+                if ("GET".equals(method)) {
+                    JSONArray arr = new JSONArray();
+                    for (Editora e : dao.listarOrdenadoPorId()) {
+                        arr.put(new JSONObject()
+                            .put("id",          e.getId())
+                            .put("nome",        e.getNome())
+                            .put("cidade",      e.getCidade())
+                            .put("anoFundacao", e.getAnoFundacao()));
                     }
-                    case "POST": {
-                        JSONObject j = readBody(ex);
-                        Editora e = new Editora(
-                            j.getString("nome"),
-                            j.getString("cidade"),
-                            j.optInt("anoFundacao", 0)
-                        );
-                        boolean ok = dao.incluirEditora(e);
-                        sendJson(ex, ok ? 201 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "PUT": {
-                        JSONObject j = readBody(ex);
-                        Editora e = dao.buscarEditoraPorId(id);
-                        if (e == null) { send404(ex); return; }
-                        e.setNome(j.optString("nome", e.getNome()));
-                        e.setCidade(j.optString("cidade", e.getCidade()));
-                        e.setAnoFundacao(j.optInt("anoFundacao", e.getAnoFundacao()));
-                        boolean ok = dao.alterarEditora(e);
-                        sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "DELETE": {
-                        try {
-                            boolean ok = dao.excluirEditora(id);
-                            sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-                        } catch (IllegalStateException e) {
-                            sendJson(ex, 409, errJson(e.getMessage()));
-                        }
-                        break;
-                    }
-                    default: ex.sendResponseHeaders(405, -1);
+                    sendJson(ex, 200, arr.toString());
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    dao.incluirEditora(new Editora(j.getString("nome"), j.optString("cidade"), j.optInt("anoFundacao")));
+                    sendJson(ex, 201, "{\"ok\":true}");
+                } else if ("PUT".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    Editora existente = dao.buscarEditora(id);
+                    if (existente == null) { send404(ex); return; }
+                    JSONObject j = readBody(ex);
+                    existente.setNome(j.getString("nome"));
+                    existente.setCidade(j.optString("cidade"));
+                    existente.setAnoFundacao(j.optInt("anoFundacao"));
+                    boolean ok = dao.alterarEditora(existente);
+                    sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirEditora(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
-        }
-
-        private JSONObject editoraToJson(Editora e) {
-            return new JSONObject()
-                .put("id",          e.getId())
-                .put("nome",        e.getNome())
-                .put("cidade",      e.getCidade())
-                .put("anoFundacao", e.getAnoFundacao());
+            } catch (IllegalStateException e) {
+                // Integridade referencial: há livros vinculados a esta editora
+                sendJson(ex, 409, "{\"erro\":\"" + e.getMessage().replace("\"", "'") + "\"}");
+            } catch (Exception e) { sendError(ex, e); }
         }
     }
 
-    // =========================================================================
-    // USUÁRIOS
-    // =========================================================================
-
+    // --- HANDLER: USUARIOS (GET list, POST, PUT /:id, DELETE /:id) ---
     private class UsuariosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
             if (handleCors(ex)) return;
             try {
-                UsuarioDAO     dao = factory.getUsuarioDAO();
-                UsuarioService svc = factory.getUsuarioService();
-                String[] parts = ex.getRequestURI().getPath().split("/");
-                boolean hasId  = parts.length >= 4 && !parts[3].isEmpty();
-                int id = hasId ? Integer.parseInt(parts[3]) : -1;
+                UsuarioDAO     dao     = factory.getUsuarioDAO();
+                UsuarioService service = factory.getUsuarioService();
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
 
-                switch (ex.getRequestMethod()) {
-                    case "GET": {
-                        if (hasId) {
-                            Usuarios u = dao.buscarUsuario(id);
-                            if (u == null) { send404(ex); return; }
-                            sendJson(ex, 200, usuarioToJson(u).toString());
-                        } else {
-                            JSONArray arr = new JSONArray();
-                            for (Usuarios u : dao.listarTodos()) arr.put(usuarioToJson(u));
-                            sendJson(ex, 200, arr.toString());
-                        }
-                        break;
-                    }
-                    case "POST": {
-                        JSONObject j = readBody(ex);
-                        int newId = svc.cadastrar(
-                            j.getString("nome"),
-                            j.getString("email"),
-                            j.getString("senha")
-                        );
-                        if (newId == -1) {
-                            sendJson(ex, 409, errJson("Email já cadastrado."));
-                        } else {
-                            sendJson(ex, 201, "{\"id\":" + newId + "}");
-                        }
-                        break;
-                    }
-                    case "PUT": {
-                        JSONObject j = readBody(ex);
-                        Usuarios u = dao.buscarUsuario(id);
-                        if (u == null) { send404(ex); return; }
-                        u.setNome(j.optString("nome", u.getNome()));
-                        u.setEmail(j.optString("email", u.getEmail()));
-                        if (j.has("senha") && !j.getString("senha").isBlank()) {
-                            String chave    = u.getEmail() + "AEDs3-G9-2025";
-                            String senhaXor = UsuarioService.xorCriptografar(j.getString("senha"), chave);
-                            u.setSenhaXor(senhaXor);
-                        }
-                        boolean ok = dao.alterarUsuario(u);
-                        sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "DELETE": {
-                        try {
-                            boolean ok = dao.excluirUsuario(id);
-                            sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-                        } catch (IllegalStateException e) {
-                            sendJson(ex, 409, errJson(e.getMessage()));
-                        }
-                        break;
-                    }
-                    default: ex.sendResponseHeaders(405, -1);
-                }
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
-        }
-
-        private JSONObject usuarioToJson(Usuarios u) {
-            return new JSONObject()
-                .put("id",    u.getId())
-                .put("nome",  u.getNome())
-                .put("email", u.getEmail());
-            // senha nunca é exposta na API
-        }
-    }
-
-    // =========================================================================
-    // AUTH (login)
-    // =========================================================================
-
-    private class AuthHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange ex) throws IOException {
-            if (handleCors(ex)) return;
-            try {
-                String path = ex.getRequestURI().getPath();
-
-                // POST /api/auth/login
-                if ("POST".equals(ex.getRequestMethod()) && path.endsWith("/login")) {
-                    UsuarioService svc = factory.getUsuarioService();
-                    JSONObject j = readBody(ex);
-                    Usuarios u = svc.login(j.getString("email"), j.getString("senha"));
-                    if (u == null) {
-                        sendJson(ex, 401, errJson("Email ou senha incorretos."));
-                    } else {
-                        JSONObject resp = new JSONObject()
+                if ("GET".equals(method)) {
+                    JSONArray arr = new JSONArray();
+                    for (Usuarios u : dao.listarTodos()) {
+                        arr.put(new JSONObject()
                             .put("id",    u.getId())
                             .put("nome",  u.getNome())
-                            .put("email", u.getEmail());
-                        sendJson(ex, 200, resp.toString());
+                            .put("email", u.getEmail()));
                     }
-                    return;
+                    sendJson(ex, 200, arr.toString());
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    int novoId = service.cadastrar(j.getString("nome"), j.getString("email"), j.getString("senha"));
+                    if (novoId == -1) sendJson(ex, 409, "{\"erro\":\"Email já cadastrado.\"}");
+                    else              sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
+                } else if ("PUT".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    Usuarios existente = dao.buscarUsuario(id);
+                    if (existente == null) { send404(ex); return; }
+                    JSONObject j = readBody(ex);
+                    existente.setNome(j.getString("nome"));
+                    existente.setEmail(j.getString("email"));
+                    if (j.has("senha") && !j.getString("senha").isBlank()) {
+                        String senhaXor = UsuarioService.xorCriptografar(
+                            j.getString("senha"),
+                            j.getString("email") + "AEDs3-G9-2025"
+                        );
+                        existente.setSenhaXor(senhaXor);
+                    }
+                    boolean ok = dao.alterarUsuario(existente);
+                    sendJson(ex, ok ? 200 : 500, "{\"ok\":" + ok + "}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirUsuario(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
-
-                ex.sendResponseHeaders(405, -1);
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
+            } catch (Exception e) { sendError(ex, e); }
         }
     }
 
-    // =========================================================================
-    // LIVROS × AUTORES (N:N)
-    // =========================================================================
-
+    // --- HANDLER: N:N LIVROS-AUTORES (GET list, POST, DELETE /:id) ---
     private class LivrosAutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
             if (handleCors(ex)) return;
             try {
                 LivroAutorDAO dao = factory.getLivroAutorDAO();
-                String[] parts   = ex.getRequestURI().getPath().split("/");
-                boolean hasId    = parts.length >= 4 && !parts[3].isEmpty();
-                int id = hasId ? Integer.parseInt(parts[3]) : -1;
+                int id = extractId(ex);
+                String method = ex.getRequestMethod();
 
-                switch (ex.getRequestMethod()) {
-                    case "GET": {
-                        if (hasId) {
-                            LivroAutor la = dao.buscarPorId(id);
-                            if (la == null) { send404(ex); return; }
-                            sendJson(ex, 200, laToJson(la).toString());
-                        } else {
-                            JSONArray arr = new JSONArray();
-                            for (LivroAutor la : dao.listarTodos()) arr.put(laToJson(la));
-                            sendJson(ex, 200, arr.toString());
-                        }
-                        break;
+                if ("GET".equals(method)) {
+                    JSONArray arr = new JSONArray();
+                    for (LivroAutor la : dao.listarTodos()) {
+                        arr.put(new JSONObject()
+                            .put("id",      la.getId())
+                            .put("idLivro", la.getIdLivro())
+                            .put("idAutor", la.getIdAutor()));
                     }
-                    case "POST": {
-                        JSONObject j = readBody(ex);
-                        boolean ok = dao.vincularAutorAoLivro(j.getInt("idLivro"), j.getInt("idAutor"));
-                        sendJson(ex, ok ? 201 : 500, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    case "DELETE": {
-                        boolean ok = dao.excluirPorId(id);
-                        sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-                        break;
-                    }
-                    default: ex.sendResponseHeaders(405, -1);
+                    sendJson(ex, 200, arr.toString());
+                } else if ("POST".equals(method)) {
+                    JSONObject j = readBody(ex);
+                    dao.vincularAutorAoLivro(j.getInt("idLivro"), j.getInt("idAutor"));
+                    sendJson(ex, 201, "{\"ok\":true}");
+                } else if ("DELETE".equals(method)) {
+                    if (id <= 0) { send404(ex); return; }
+                    boolean ok = dao.excluirPorId(id);
+                    sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
+                } else {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
-            } catch (Exception e) {
-                sendError(ex, e);
-            }
-        }
-
-        private JSONObject laToJson(LivroAutor la) {
-            return new JSONObject()
-                .put("id",      la.getId())
-                .put("idLivro", la.getIdLivro())
-                .put("idAutor", la.getIdAutor());
+            } catch (Exception e) { sendError(ex, e); }
         }
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
+    // --- HANDLER: AUTH ---
+    private class AuthHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            if (handleCors(ex)) return;
+            try {
+                if ("POST".equals(ex.getRequestMethod()) && ex.getRequestURI().getPath().endsWith("/login")) {
+                    JSONObject j = readBody(ex);
+                    Usuarios u = factory.getUsuarioService().login(j.getString("email"), j.getString("senha"));
+                    if (u == null) sendJson(ex, 401, "{\"erro\":\"Credenciais invalidas\"}");
+                    else           sendJson(ex, 200, new JSONObject().put("id", u.getId()).put("nome", u.getNome()).toString());
+                }
+            } catch (Exception e) { sendError(ex, e); }
+        }
+    }
+
+    // --- AUXILIARES ---
+
+    /** Extrai o ID do path. Ex: /api/livros/42 → 42. Retorna -1 se ausente/inválido. */
+    private static int extractId(HttpExchange ex) {
+        String[] parts = ex.getRequestURI().getPath().split("/");
+        if (parts.length >= 4) {
+            try { return Integer.parseInt(parts[3]); } catch (NumberFormatException ignored) {}
+        }
+        return -1;
+    }
 
     private static boolean handleCors(HttpExchange ex) throws IOException {
-        setCorsHeaders(ex);
-        if ("OPTIONS".equals(ex.getRequestMethod())) {
-            ex.sendResponseHeaders(204, -1);
-            return true;
-        }
+        ex.getResponseHeaders().set("Access-Control-Allow-Origin",  "*");
+        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+        if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); return true; }
         return false;
     }
 
-    private static void setCorsHeaders(HttpExchange ex) {
-        ex.getResponseHeaders().set("Access-Control-Allow-Origin",  "*");
-        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    }
-
     private static JSONObject readBody(HttpExchange ex) throws IOException {
-        try (InputStream is = ex.getRequestBody()) {
-            String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            return new JSONObject(body);
-        }
+        return new JSONObject(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
     }
 
     private static void sendJson(HttpExchange ex, int status, String json) throws IOException {
-        byte[] body = json.getBytes(StandardCharsets.UTF_8);
-        ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        ex.sendResponseHeaders(status, body.length);
-        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+        byte[] b = json.getBytes(StandardCharsets.UTF_8);
+        ex.getResponseHeaders().set("Content-Type", "application/json");
+        ex.sendResponseHeaders(status, b.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(b); }
     }
 
     private static void send(HttpExchange ex, int status, String ct, String msg) throws IOException {
-        byte[] body = msg.getBytes(StandardCharsets.UTF_8);
+        byte[] b = msg.getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().set("Content-Type", ct);
-        ex.sendResponseHeaders(status, body.length);
-        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+        ex.sendResponseHeaders(status, b.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(b); }
     }
 
-    private static void send404(HttpExchange ex) throws IOException {
-        sendJson(ex, 404, errJson("Não encontrado."));
+    private void send404(HttpExchange ex) throws IOException { sendJson(ex, 404, "{\"erro\":\"Not found\"}"); }
+
+    private void sendError(HttpExchange ex, Exception e) throws IOException {
+        String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "Erro interno";
+        sendJson(ex, 500, "{\"erro\":\"" + msg + "\"}");
     }
 
-    private static void sendError(HttpExchange ex, Exception e) throws IOException {
-        e.printStackTrace();
-        String msg = e.getMessage() != null ? e.getMessage() : "Erro interno";
-        sendJson(ex, 500, errJson(msg));
-    }
-
-    private static String errJson(String msg) {
-        return new JSONObject().put("erro", msg).toString();
-    }
-
-    /**
-     * Garante que o ISBN tenha exatamente 13 caracteres,
-     * truncando se maior ou preenchendo com espaços se menor.
-     */
     private static char[] padIsbn(String raw) {
-        if (raw == null) raw = "";
-        raw = raw.strip();
-        if (raw.length() > 13) raw = raw.substring(0, 13);
-        StringBuilder sb = new StringBuilder(raw);
-        while (sb.length() < 13) sb.append(' ');
-        return sb.toString().toCharArray();
+        return String.format("%-13s", (raw == null ? "" : raw)).substring(0, 13).toCharArray();
     }
 
-    /**
-     * Faz o parse de um campo que pode vir como JSONArray ou String com vírgulas.
-     * Usado para o campo generos[] do Livro.
-     */
     private static String[] parseStringArray(JSONObject j, String campo) {
         if (!j.has(campo)) return new String[0];
-        Object v = j.get(campo);
-        if (v instanceof JSONArray) {
-            JSONArray arr = (JSONArray) v;
-            String[] result = new String[arr.length()];
-            for (int i = 0; i < arr.length(); i++) result[i] = arr.getString(i).trim();
-            return result;
-        }
-        String str = v.toString().trim();
-        if (str.isEmpty()) return new String[0];
-        String[] parts = str.split(",");
-        for (int i = 0; i < parts.length; i++) parts[i] = parts[i].trim();
-        return parts;
+        JSONArray a = j.getJSONArray(campo);
+        String[] r = new String[a.length()];
+        for (int i = 0; i < a.length(); i++) r[i] = a.getString(i);
+        return r;
     }
 }

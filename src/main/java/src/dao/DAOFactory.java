@@ -3,57 +3,55 @@ package src.dao;
 import src.service.UsuarioService;
 
 /**
- * Fábrica central de DAOs.
+ * Fábrica Central de DAOs (Data Access Objects).
  *
- * Tabelas do sistema:
- *   - Editora       (1 lado do 1:N com Livro)
- *   - Livro         (N lado do 1:N; possui campo multivalorado: generos[])
- *   - Autores
- *   - LivroAutor    (tabela intermediária do N:N entre Livro e Autores)
- *   - Usuarios      (autenticação XOR)
- *
- * As instâncias são singletons dentro do DAOFactory — um único factory
- * deve ser criado e reutilizado durante toda a execução.
+ * Atua como um contêiner de Injeção de Dependências (DI), garantindo que
+ * todas as partes do sistema (como o ApiServer) utilizem exatamente as 
+ * mesmas instâncias em memória, evitando concorrência nos arquivos físicos.
+ * * É nesta classe que as restrições de Integridade Referencial são "amarradas".
  */
 public class DAOFactory {
 
-    private final EditoraDAO    editoraDAO;
-    private final AutoresDAO    autoresDAO;
-    private final LivroDAO      livroDAO;
-    private final LivroAutorDAO livroAutorDAO;
-    private final UsuarioDAO    usuarioDAO;
+    private final EditoraDAO     editoraDAO;
+    private final AutoresDAO     autoresDAO;
+    private final LivroDAO       livroDAO;
+    private final LivroAutorDAO  livroAutorDAO;
+    private final UsuarioDAO     usuarioDAO;
     private final UsuarioService usuarioService;
 
     public DAOFactory() throws Exception {
 
-        // 1. Instancia todos os DAOs
-        editoraDAO    = new EditoraDAO();
-        autoresDAO    = new AutoresDAO();
-        livroDAO      = new LivroDAO();
-        livroAutorDAO = new LivroAutorDAO();
-        usuarioDAO    = new UsuarioDAO();
+        // 1. Instanciação Base (Abre/Cria os arquivos .bin e .idx)
+        this.editoraDAO    = new EditoraDAO();
+        this.autoresDAO    = new AutoresDAO();
+        this.livroDAO      = new LivroDAO();
+        this.livroAutorDAO = new LivroAutorDAO();
+        this.usuarioDAO    = new UsuarioDAO();
 
-        // 2. Injeta dependências para integridade referencial
+        // 2. Injeção de Dependências (Garantia de Integridade Referencial)
+        
+        // EditoraDAO bloqueia exclusão se houver livros vinculados a ela
+        this.editoraDAO.setLivroDAO(this.livroDAO);
 
-        // EditoraDAO bloqueia exclusão se houver livros vinculados
-        editoraDAO.setLivroDAO(livroDAO);
+        // AutoresDAO bloqueia exclusão se houver vínculos na tabela livros_autores
+        this.autoresDAO.setLivroAutorDAO(this.livroAutorDAO);
 
-        // AutoresDAO bloqueia exclusão se houver vínculos em livros_autores
-        autoresDAO.setLivroAutorDAO(livroAutorDAO);
+        // LivroDAO verifica vínculos em livros_autores antes de ser excluído
+        this.livroDAO.setLivroAutorDAO(this.livroAutorDAO);
 
-        // LivroDAO verifica vínculos em livros_autores antes de excluir
-        livroDAO.setLivroAutorDAO(livroAutorDAO);
-
-        // 3. Serviço de autenticação com criptografia XOR
-        usuarioService = new UsuarioService(usuarioDAO);
+        // 3. Inicialização de Serviços de Negócio (Camada de Segurança)
+        this.usuarioService = new UsuarioService(this.usuarioDAO);
     }
 
-    // --- Getters ---
+    // -------------------------------------------------------------------------
+    // Getters - Acesso centralizado para os handlers da API
+    // -------------------------------------------------------------------------
 
-    public EditoraDAO    getEditoraDAO()      { return editoraDAO; }
-    public AutoresDAO    getAutoresDAO()      { return autoresDAO; }
-    public LivroDAO      getLivroDAO()        { return livroDAO; }
-    public LivroAutorDAO getLivroAutorDAO()   { return livroAutorDAO; }
-    public UsuarioDAO    getUsuarioDAO()      { return usuarioDAO; }
-    public UsuarioService getUsuarioService() { return usuarioService; }
+    public EditoraDAO     getEditoraDAO()      { return this.editoraDAO; }
+    public AutoresDAO     getAutoresDAO()      { return this.autoresDAO; }
+    public LivroDAO       getLivroDAO()        { return this.livroDAO; }
+    public LivroAutorDAO  getLivroAutorDAO()   { return this.livroAutorDAO; }
+    public UsuarioDAO     getUsuarioDAO()      { return this.usuarioDAO; }
+    public UsuarioService getUsuarioService()  { return this.usuarioService; }
+    
 }
