@@ -3,26 +3,8 @@ package src.util;
 import java.io.File;
 import java.io.RandomAccessFile;
 
-/**
- * Hash Extensível em Memória Secundária.
- *
- * Dois papéis no sistema (conforme enunciado Fase 2):
- *   - Busca direta por igualdade na chave primária (id → offset) em O(1) amortizado.
- *   - Cada DAO mantém um HashExtensivel (busca) + ArvoreBMais (ordenação/intervalo).
- *
- * Dois arquivos físicos por instância:
- *   <nome>.dir.bin  — diretório: profundidade global + ponteiros para buckets
- *   <nome>.bkt.bin  — buckets: profundidade local + pares (chave int, offset long)
- *
- * Layout do diretório:
- *   [0..3]  int    profundidade global
- *   [4..]   long[] ponteiros para buckets (2^profGlobal entradas, 8 bytes cada)
- *
- * Layout de cada bucket:
- *   [0..3]  int    profundidade local
- *   [4..7]  int    quantidade de pares ativos
- *   [8..]   (int chave + long offset) × TAM_BUCKET  — slots fixos
- */
+
+
 public class HashExtensivel implements Indexador {
 
     private static final int  TAM_BUCKET  = 10;
@@ -53,38 +35,32 @@ public class HashExtensivel implements Indexador {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Indexador — operações públicas
-    // -------------------------------------------------------------------------
+    // Indexador 
 
-    @Override
+    
     public void inserir(int chave, long enderecoNoArquivo) throws Exception {
         inserirNoBucket(chave, enderecoNoArquivo);
     }
 
-    @Override
+    
     public long buscar(int chave) throws Exception {
         long endBkt = getEnderecoDoBucket(hash(chave));
         return buscarNoBucket(endBkt, chave);
     }
 
-    @Override
+    
     public boolean remover(int chave) throws Exception {
         long endBkt = getEnderecoDoBucket(hash(chave));
         return removerDoBucket(endBkt, chave);
     }
 
-    @Override
+    
     public boolean atualizar(int chave, long novoEndereco) throws Exception {
         long endBkt = getEnderecoDoBucket(hash(chave));
         return atualizarNoBucket(endBkt, chave, novoEndereco);
     }
 
-    /**
-     * Conta pares ativos varrendo todos os buckets únicos.
-     * Usado para estatísticas; não é chamado em hot paths.
-     */
-    @Override
+    
     public long getTotalChaves() throws Exception {
         int capacidade = 1 << profGlobal;
         long total = 0;
@@ -101,12 +77,8 @@ public class HashExtensivel implements Indexador {
         return total;
     }
 
-    /**
-     * Hash não tem ordenação natural — devolve os pares na ordem física dos buckets.
-     * Não use este método para listagem ordenada: use a ArvoreBMais para isso.
-     * Implementado apenas para satisfazer a interface Indexador.
-     */
-    @Override
+
+    
     public long[][] listarOrdenado() throws Exception {
         int capacidade = 1 << profGlobal;
         java.util.List<long[]> lista = new java.util.ArrayList<>();
@@ -136,9 +108,9 @@ public class HashExtensivel implements Indexador {
         this.bucket.close();
     }
 
-    // -------------------------------------------------------------------------
+    
     // Lógica interna
-    // -------------------------------------------------------------------------
+
 
     private int hash(int chave) {
         return chave & ((1 << this.profGlobal) - 1);

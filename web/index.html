@@ -165,7 +165,7 @@
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('livros','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
           <button class="order-btn" onclick="setOrder('livros','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
-          <button class="order-btn" onclick="loadTituloOrder()" title="Por Título — Ordenação por Intercalação (3d-1)">Az Título</button>
+          <button class="order-btn" onclick="loadNomeOrder('livros')" title="Por Título — Ordenação por Intercalação (3d-1)">Az Título</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('livros')">↻</button>
       </div>
@@ -189,7 +189,7 @@
       <div class="page-header">
         <div>
           <div class="page-title">Autores</div>
-          <div class="page-subtitle">Cadastro de autores do acervo</div>
+          <div class="page-subtitle">Cadastro de autores — ordenação via Árvore B+ e Intercalação Externa</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('autores')">＋ Novo Autor</button>
       </div>
@@ -197,6 +197,11 @@
         <div class="search-inline">
           <span>🔍</span>
           <input type="text" placeholder="Filtrar autores…" oninput="filterTable('autores-tbody', this.value)">
+        </div>
+        <div class="order-toggle">
+          <button class="order-btn active" onclick="setOrder('autores','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
+          <button class="order-btn" onclick="setOrder('autores','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
+          <button class="order-btn" onclick="loadNomeOrder('autores')" title="Por Nome — Ordenação por Intercalação (3d-1)">Az Nome</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('autores')">↻</button>
       </div>
@@ -217,7 +222,7 @@
       <div class="page-header">
         <div>
           <div class="page-title">Editoras</div>
-          <div class="page-subtitle">Gerenciamento de editoras — chave estrangeira dos Livros (1:N)</div>
+          <div class="page-subtitle">Gerenciamento de editoras — ordenação via Árvore B+ e Intercalação Externa</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('editoras')">＋ Nova Editora</button>
       </div>
@@ -225,6 +230,11 @@
         <div class="search-inline">
           <span>🔍</span>
           <input type="text" placeholder="Filtrar editoras…" oninput="filterTable('editoras-tbody', this.value)">
+        </div>
+        <div class="order-toggle">
+          <button class="order-btn active" onclick="setOrder('editoras','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
+          <button class="order-btn" onclick="setOrder('editoras','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
+          <button class="order-btn" onclick="loadNomeOrder('editoras')" title="Por Nome — Ordenação por Intercalação (3d-1)">Az Nome</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('editoras')">↻</button>
       </div>
@@ -336,7 +346,7 @@
       <div class="page-header">
         <div>
           <div class="page-title">Usuários</div>
-          <div class="page-subtitle">Contas de acesso com senha criptografada via XOR e redes sociais</div>
+          <div class="page-subtitle">Contas de acesso — ordenação via Árvore B+ e Intercalação Externa</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('usuarios')">＋ Novo Usuário</button>
       </div>
@@ -344,6 +354,11 @@
         <div class="search-inline">
           <span>🔍</span>
           <input type="text" placeholder="Filtrar usuários…" oninput="filterTable('usuarios-tbody', this.value)">
+        </div>
+        <div class="order-toggle">
+          <button class="order-btn active" onclick="setOrder('usuarios','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
+          <button class="order-btn" onclick="setOrder('usuarios','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
+          <button class="order-btn" onclick="loadNomeOrder('usuarios')" title="Por Nome — Ordenação por Intercalação (3d-1)">Az Nome</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('usuarios')">↻</button>
       </div>
@@ -660,22 +675,6 @@
   function reloadCurrent() {
     if (currentPage === 'dashboard') loadDashboard();
     else loadTable(currentPage);
-  }
-
-  // Ordenação por título (Intercalação Externa — item 3d-1)
-  async function loadTituloOrder() {
-    document.querySelectorAll('#page-livros .order-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
-
-    const tbody = document.getElementById('livros-tbody');
-    tbody.innerHTML = `<tr class="loading-row"><td colspan="9"><span class="spinner"></span>Ordenando por intercalação...</td></tr>`;
-    try {
-      const data = await apiFetch('/api/livros?ordem=titulo');
-      renderRows('livros', tbody, data);
-      toast('Ordenado por título via Intercalação Externa (3d-1)', false, true);
-    } catch (e) {
-      toast(e.message, true);
-    }
   }
 </script>
 </body>

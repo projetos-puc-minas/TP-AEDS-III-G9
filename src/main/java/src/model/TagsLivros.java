@@ -8,11 +8,7 @@ import java.io.IOException;
 
 import src.util.Registro;
 
-/**
- * Modelo da Tabela Intermediária (Relacionamento N:N).
- * Vincula uma Tag a um Livro através das chaves estrangeiras (idTag e idLivro).
- * Como contém apenas inteiros, o tamanho após serialização é fixo (12 bytes de dados).
- */
+
 public class TagsLivros implements Registro {
 
     private boolean lapide;
@@ -21,9 +17,7 @@ public class TagsLivros implements Registro {
     private int     idTag;
     private int     idLivro;
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public TagsLivros() {
         this(-1, -1, -1);
@@ -40,9 +34,7 @@ public class TagsLivros implements Registro {
         this.idLivro = idLivro;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -53,9 +45,7 @@ public class TagsLivros implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public int  getIdTag()               { return idTag; }
     public void setIdTag(int idTag)      { this.idTag = idTag; }
@@ -63,9 +53,9 @@ public class TagsLivros implements Registro {
     public int  getIdLivro()             { return idLivro; }
     public void setIdLivro(int idLivro)  { this.idLivro = idLivro; }
 
-    // -------------------------------------------------------------------------
-    // Serialização (Tamanho Fixo — apenas ints)
-    // -------------------------------------------------------------------------
+
+    // Serialização
+
 
     @Override
     public byte[] toByteArray() throws IOException {

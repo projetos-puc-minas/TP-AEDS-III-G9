@@ -13,22 +13,13 @@ import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
 import src.util.OrdenacaoExterna;
 
-/**
- * DAO de Editoras.
- *
- * * Índice B+: chave = id, valor = offset físico no editoras.bin.
- *
- * INTEGRIDADE REFERENCIAL (1:N):
- * - O método excluirEditora() verifica se existem livros dependentes
- * antes de proceder à remoção física, garantindo que não fiquem
- * registos "órfãos" no sistema.
- */
+
 public class EditoraDAO {
 
     private final Arquivo<Editora> arqEditoras;
-    private final ArvoreBMais      indice;   // B+: listagem ordenada
-    private final HashExtensivel   hash;     // Hash: busca direta
-    private LivroDAO               livroDAO; // Dependência para verificar integridade
+    private final ArvoreBMais      indice;   
+    private final HashExtensivel   hash;     
+    private LivroDAO               livroDAO; 
 
     public EditoraDAO() throws Exception {
         arqEditoras = new Arquivo<>("editoras", Editora.class.getConstructor());
@@ -36,14 +27,11 @@ public class EditoraDAO {
         hash        = new HashExtensivel("editoras_id");
     }
 
-    /** Injeta o LivroDAO para permitir a verificação de chaves estrangeiras. */
     public void setLivroDAO(LivroDAO livroDAO) {
         this.livroDAO = livroDAO;
     }
 
-    // -------------------------------------------------------------------------
     // CREATE
-    // -------------------------------------------------------------------------
 
     public boolean incluirEditora(Editora editora) throws Exception {
         CreateResult cr = arqEditoras.create(editora);
@@ -55,9 +43,7 @@ public class EditoraDAO {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // READ
-    // -------------------------------------------------------------------------
 
     public Editora buscarEditora(int id) throws Exception {
         long offset = hash.buscar(id); // Hash: O(1) amortizado
@@ -71,9 +57,7 @@ public class EditoraDAO {
         return arqEditoras.listarTodos();
     }
 
-    // -------------------------------------------------------------------------
     // UPDATE
-    // -------------------------------------------------------------------------
 
     public boolean alterarEditora(Editora editora) throws Exception {
         boolean ok = arqEditoras.update(editora);
@@ -83,14 +67,8 @@ public class EditoraDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
-    // DELETE (com validação de integridade)
-    // -------------------------------------------------------------------------
+    // DELETE 
 
-    /**
-     * Exclui uma editora apenas se não houver livros vinculados a ela.
-     * @throws IllegalStateException caso existam livros dependentes.
-     */
     public boolean excluirEditora(int id) throws Exception {
         // Verifica se existem livros desta editora no LivroDAO
         if (livroDAO != null && !livroDAO.buscarLivrosPorEditora(id).isEmpty()) {
@@ -107,9 +85,7 @@ public class EditoraDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
     // LISTAGEM ORDENADA (via B+)
-    // -------------------------------------------------------------------------
 
     public List<Editora> listarOrdenadoPorId() throws Exception {
         long[][] pares = indice.listarOrdenado();
@@ -143,10 +119,6 @@ public class EditoraDAO {
         return res;
     }
 
-    /**
-     * Ordenação externa por intercalação — ordena editoras pelo nome
-     * sem carregar todos os registros na RAM de uma vez.
-     */
     public List<Editora> listarOrdenadoPorNome() throws Exception {
         OrdenacaoExterna<Editora> ord = new OrdenacaoExterna<>(
             arqEditoras,
@@ -162,14 +134,8 @@ public class EditoraDAO {
         return res;
     }
 
-    // -------------------------------------------------------------------------
-    // Auxiliar (Otimizado)
-    // -------------------------------------------------------------------------
+    // Auxiliar 
 
-    /**
-     * Localiza o novo offset de um registo após um update estrutural.
-     * Salta blocos apagados para poupar recursos.
-     */
     private void reindexar(int id) throws Exception {
         try (RandomAccessFile raf = new RandomAccessFile("./data/editoras.bin", "r")) {
             raf.seek(Arquivo.TAM_CABECALHO);

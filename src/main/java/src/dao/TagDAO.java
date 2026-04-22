@@ -13,21 +13,7 @@ import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
 import src.util.OrdenacaoExterna;
 
-/**
- * DAO de Tags.
- *
- * Indexação implementada conforme o enunciado (Fase 2, item 3b):
- *   - HashExtensivel : busca direta por igualdade na chave primária (id → offset) em O(1).
- *   - ArvoreBMais    : listagem ordenada e suporte a consultas por intervalo (3b-ii).
- *
- * Exibição (item 3d):
- *   - listarOrdenadoPorId()             → crescente via travessia das folhas da Árvore B+.
- *   - listarOrdenadoDecrescentePorId()  → decrescente via travessia inversa da Árvore B+.
- *
- * INTEGRIDADE REFERENCIAL (N:N):
- *   - excluirTag() bloqueia a exclusão se houver livros vinculados via tags_livros.
- *   - excluirTagEmCascata() remove a tag E todos os seus vínculos.
- */
+
 public class TagDAO {
 
     private final Arquivo<Tag>   arqTags;
@@ -47,9 +33,7 @@ public class TagDAO {
         this.tagsLivrosDAO = tagsLivrosDAO;
     }
 
-    // -------------------------------------------------------------------------
     // CREATE
-    // -------------------------------------------------------------------------
 
     public int criarTag(Tag tag) throws Exception {
         CreateResult cr = arqTags.create(tag);
@@ -60,9 +44,7 @@ public class TagDAO {
         return cr.id;
     }
 
-    // -------------------------------------------------------------------------
     // READ
-    // -------------------------------------------------------------------------
 
     public Tag buscarTag(int id) throws Exception {
         long offset = hash.buscar(id);
@@ -76,9 +58,7 @@ public class TagDAO {
         return arqTags.listarTodos();
     }
 
-    // -------------------------------------------------------------------------
     // UPDATE
-    // -------------------------------------------------------------------------
 
     public boolean alterarTag(Tag tag) throws Exception {
         boolean ok = arqTags.update(tag);
@@ -88,14 +68,8 @@ public class TagDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
-    // DELETE — com integridade referencial
-    // -------------------------------------------------------------------------
+    // DELETE 
 
-    /**
-     * Exclui uma tag apenas se não houver livros vinculados.
-     * @throws IllegalStateException caso existam vínculos ativos.
-     */
     public boolean excluirTag(int id) throws Exception {
         if (tagsLivrosDAO != null && !tagsLivrosDAO.buscarLivrosDaTag(id).isEmpty()) {
             throw new IllegalStateException(
@@ -112,9 +86,7 @@ public class TagDAO {
         return ok;
     }
 
-    /**
-     * Exclui a tag E todos os seus vínculos com livros (Delete em Cascata).
-     */
+
     public boolean excluirTagEmCascata(int id) throws Exception {
         if (tagsLivrosDAO != null) {
             tagsLivrosDAO.excluirLivrosDaTag(id);
@@ -127,9 +99,7 @@ public class TagDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
-    // LISTAGEM ORDENADA (travessia das folhas da Árvore B+)
-    // -------------------------------------------------------------------------
+    // LISTAGEM ORDENADA
 
     public List<Tag> listarOrdenadoPorId() throws Exception {
         long[][] pares = indice.listarOrdenado();
@@ -167,10 +137,6 @@ public class TagDAO {
         return res;
     }
 
-    /**
-     * Ordenação externa por intercalação — ordena tags pelo nome
-     * sem carregar todos os registros na RAM de uma vez.
-     */
     public List<Tag> listarOrdenadoPorNome() throws Exception {
         OrdenacaoExterna<Tag> ord = new OrdenacaoExterna<>(
             arqTags,
@@ -186,9 +152,7 @@ public class TagDAO {
         return res;
     }
 
-    // -------------------------------------------------------------------------
-    // Auxiliar — Reindexação após Update Estrutural
-    // -------------------------------------------------------------------------
+    // Auxiliar 
 
     private void reindexar(int id) throws Exception {
         try (RandomAccessFile raf = new RandomAccessFile("./data/tags.bin", "r")) {

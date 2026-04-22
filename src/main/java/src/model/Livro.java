@@ -9,14 +9,7 @@ import java.io.IOException;
 import src.util.Registro;
 import src.util.SerializadorUtil;
 
-/**
- * Modelo Principal: Livro.
- * * Demonstra a utilização de campos variados conforme exigido no enunciado:
- * - idEditora : Chave estrangeira (relacionamento 1:N com Editora).
- * - isbn      : Campo de tamanho fixo (13 caracteres).
- * * Toda a serialização delega o tratamento de Strings para o SerializadorUtil,
- * garantindo a integridade dos ficheiros binários através do delimitador ';'.
- */
+
 public class Livro implements Registro {
 
     private boolean lapide;
@@ -29,9 +22,7 @@ public class Livro implements Registro {
     private double  preco;
     private String  sinopse;
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public Livro() {
         this(-1, -1, "", new char[13], 0, 0.0, "");
@@ -54,9 +45,7 @@ public class Livro implements Registro {
         this.sinopse       = sinopse;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -67,9 +56,7 @@ public class Livro implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public int      getIdEditora()                    { return idEditora; }
     public void     setIdEditora(int idEditora)       { this.idEditora = idEditora; }
@@ -89,10 +76,7 @@ public class Livro implements Registro {
     public String   getSinopse()                      { return sinopse; }
     public void     setSinopse(String sinopse)        { this.sinopse = sinopse; }
 
-    // -------------------------------------------------------------------------
-    // Serialização (Padrão do Projeto)
-    // -------------------------------------------------------------------------
-
+    // Serialização
     @Override
     public byte[] toByteArray() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -123,9 +107,7 @@ public class Livro implements Registro {
         this.sinopse       = SerializadorUtil.readString(dis);
     }
 
-    // -------------------------------------------------------------------------
     // Impressão Formatada
-    // -------------------------------------------------------------------------
 
     @Override
     public String toString() {

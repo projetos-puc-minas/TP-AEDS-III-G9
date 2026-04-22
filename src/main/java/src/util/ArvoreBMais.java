@@ -15,10 +15,6 @@ public class ArvoreBMais implements Indexador {
     private static final int OFFSET_RAIZ  = 0;
     private static final int OFFSET_TOTAL = 8;
 
-    // Tamanho fixo de um nó em bytes:
-    //   1 (boolean) + 4 (int qtdChaves)
-    //   + ORDEM * (4 int chave + 8 long ptr)
-    //   + 8 (último ponteiro: ptrs[ORDEM] em internos, ptrProximo em folhas)
     public static final int TAM_NO =
             1 + 4 + ORDEM * (4 + 8) + 8;
 
@@ -32,16 +28,14 @@ public class ArvoreBMais implements Indexador {
 
         if (idx.length() < TAM_CABECALHO) {
             idx.seek(0);
-            idx.writeLong(NULO);  // raiz
-            idx.writeLong(0L);    // total de chaves
-            idx.writeLong(0L);    // reservado
-            idx.writeLong(0L);    // reservado
+            idx.writeLong(NULO);  
+            idx.writeLong(0L);    
+            idx.writeLong(0L);    
+            idx.writeLong(0L);    
         }
     }
 
-    // -------------------------------------------------------------------------
     // Indexador
-    // -------------------------------------------------------------------------
 
     @Override
     public void inserir(int chave, long endereco) throws Exception {
@@ -78,12 +72,7 @@ public class ArvoreBMais implements Indexador {
         return buscarRecursivo(raiz, chave);
     }
 
-    /**
-     * Remove a chave da folha.
-     * LIMITAÇÃO CONHECIDA: underflow não tratado (sem fusão/redistribuição).
-     * Aceitável na Fase 2; deve ser corrigido em fases posteriores.
-     */
-    @Override
+
     public boolean remover(int chave) throws Exception {
         long raiz = getRaiz();
         if (raiz == NULO) return false;
@@ -99,7 +88,6 @@ public class ArvoreBMais implements Indexador {
         return atualizarNaFolha(raiz, chave, novoEndereco);
     }
 
-    // @Override
     public long[][] listarOrdenado() throws Exception {
         long raiz = getRaiz();
         if (raiz == NULO) return new long[0][0];
@@ -127,6 +115,24 @@ public class ArvoreBMais implements Indexador {
     }
 
     // @Override
+    public long[][] listarOrdenadoDecrescente() throws Exception {
+        long[][] crescente = listarOrdenado();
+
+        // Inverte o array in-place sem alocar uma nova estrutura de dados
+        int esq = 0;
+        int dir = crescente.length - 1;
+        while (esq < dir) {
+            long[] tmp       = crescente[esq];
+            crescente[esq]   = crescente[dir];
+            crescente[dir]   = tmp;
+            esq++;
+            dir--;
+        }
+
+        return crescente;
+    }
+
+    // @Override
     public long getTotalChaves() throws Exception {
         idx.seek(OFFSET_TOTAL);
         return idx.readLong();
@@ -137,9 +143,7 @@ public class ArvoreBMais implements Indexador {
         idx.close();
     }
 
-    // -------------------------------------------------------------------------
     // Inserção recursiva
-    // -------------------------------------------------------------------------
 
     private ResultadoInsercao inserirRecursivo(long posNo, int chave, long endereco) throws Exception {
         No no = lerNo(posNo);
@@ -272,9 +276,7 @@ public class ArvoreBMais implements Indexador {
         return res;
     }
 
-    // -------------------------------------------------------------------------
     // Busca
-    // -------------------------------------------------------------------------
 
     private long buscarRecursivo(long posNo, int chave) throws Exception {
         No no = lerNo(posNo);
@@ -290,9 +292,7 @@ public class ArvoreBMais implements Indexador {
         return buscarRecursivo(no.ptrs[i + 1], chave);
     }
 
-    // -------------------------------------------------------------------------
     // Remoção (sem rebalanceamento)
-    // -------------------------------------------------------------------------
 
     private boolean removerNaFolha(long posNo, int chave) throws Exception {
         No no = lerNo(posNo);
@@ -317,9 +317,7 @@ public class ArvoreBMais implements Indexador {
         return removerNaFolha(no.ptrs[i + 1], chave);
     }
 
-    // -------------------------------------------------------------------------
     // Atualização
-    // -------------------------------------------------------------------------
 
     private boolean atualizarNaFolha(long posNo, int chave, long novoEndereco) throws Exception {
         No no = lerNo(posNo);
@@ -340,9 +338,7 @@ public class ArvoreBMais implements Indexador {
         return atualizarNaFolha(no.ptrs[i + 1], chave, novoEndereco);
     }
 
-    // -------------------------------------------------------------------------
     // I/O de nós — layout fixo (TAM_NO bytes por nó)
-    // -------------------------------------------------------------------------
 
     private No lerNo(long posicao) throws Exception {
         idx.seek(posicao);
@@ -377,9 +373,7 @@ public class ArvoreBMais implements Indexador {
         return posicao;
     }
 
-    // -------------------------------------------------------------------------
     // Cabeçalho
-    // -------------------------------------------------------------------------
 
     private long getRaiz() throws Exception {
         idx.seek(OFFSET_RAIZ);
@@ -396,9 +390,7 @@ public class ArvoreBMais implements Indexador {
         idx.writeLong(idx.readLong() + delta);
     }
 
-    // -------------------------------------------------------------------------
     // Classes internas
-    // -------------------------------------------------------------------------
 
     private static class No {
         boolean folha;

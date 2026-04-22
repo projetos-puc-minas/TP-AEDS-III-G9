@@ -14,28 +14,15 @@ import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
 import src.util.OrdenacaoExterna;
 
-/**
- * DAO da tabela intermédia livros_autores (N:N entre Livros e Autores).
- *
- * Índices mantidos:
- * - indiceId       → B+ por PK (id → offset)       para busca direta.
- * - indicePorLivro → B+ por idLivro (idLivro → offset) para buscar todos os autores de um livro.
- * - indicePorAutor → B+ por idAutor (idAutor → offset) para buscar todos os livros de um autor.
- *
- * LIMITAÇÃO CONHECIDA (Fase 2):
- * A Árvore B+ não suporta chaves duplicadas. Para os índices secundários,
- * a chave utilizada é uma composição matemática:
- * chave = idEstrangeiro * MAX_ID + id (garantindo unicidade absoluta).
- * A pesquisa percorre as folhas (range scan) e filtra pelos IDs correspondentes.
- */
+
 public class LivroAutorDAO {
 
     // Constante base para gerar chaves compostas (suficiente para as restrições de int)
     private static final int MAX_ID = 100_000;
 
     private final Arquivo<LivroAutor> arqLivrosAutores;
-    private final ArvoreBMais         indiceId;       // B+: listagem e range scan
-    private final HashExtensivel      hashId;         // Hash: busca direta por PK
+    private final ArvoreBMais         indiceId;      
+    private final HashExtensivel      hashId;        
     private final ArvoreBMais         indicePorLivro;
     private final ArvoreBMais         indicePorAutor;
 
@@ -47,13 +34,8 @@ public class LivroAutorDAO {
         indicePorAutor   = new ArvoreBMais("livros_autores_por_autor");
     }
 
-    // -------------------------------------------------------------------------
     // CREATE (Vincular)
-    // -------------------------------------------------------------------------
 
-    /**
-     * Cria o vínculo N:N e insere nos TRÊS índices B+.
-     */
     public boolean vincularAutorAoLivro(int idLivro, int idAutor) throws Exception {
         LivroAutor novo = new LivroAutor(idLivro, idAutor);
         CreateResult cr = arqLivrosAutores.create(novo);
@@ -68,9 +50,7 @@ public class LivroAutorDAO {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // READ
-    // -------------------------------------------------------------------------
 
     public LivroAutor buscarPorId(int id) throws Exception {
         long offset = hashId.buscar(id); // Hash: O(1)
@@ -84,7 +64,6 @@ public class LivroAutorDAO {
         return arqLivrosAutores.listarTodos();
     }
 
-    /** Busca rápida usando a Árvore B+ (Range Scan). */
     public List<LivroAutor> buscarAutoresDoLivro(int idLivro) throws Exception {
         return buscarPorIndiceSecundario(
             indicePorLivro,
@@ -93,7 +72,6 @@ public class LivroAutorDAO {
         );
     }
 
-    /** Busca rápida usando a Árvore B+ (Range Scan). */
     public List<LivroAutor> buscarLivrosDoAutor(int idAutor) throws Exception {
         return buscarPorIndiceSecundario(
             indicePorAutor,
@@ -102,13 +80,8 @@ public class LivroAutorDAO {
         );
     }
 
-    // -------------------------------------------------------------------------
     // DELETE
-    // -------------------------------------------------------------------------
 
-    /**
-     * Remove um vínculo e limpa os TRÊS índices.
-     */
     public boolean excluirPorId(int id) throws Exception {
         LivroAutor la = buscarPorId(id);
         if (la == null) return false;
@@ -152,10 +125,7 @@ public class LivroAutorDAO {
         return res;
     }
 
-    /**
-     * Ordenação externa por intercalação — ordena os vínculos pelo idLivro
-     * sem carregar todos os registros na RAM de uma vez.
-     */
+
     public List<LivroAutor> listarOrdenadoPorIdLivro() throws Exception {
         OrdenacaoExterna<LivroAutor> ord = new OrdenacaoExterna<>(
             arqLivrosAutores,
@@ -171,14 +141,8 @@ public class LivroAutorDAO {
         return res;
     }
 
-    // -------------------------------------------------------------------------
-    // Auxiliares (Gestão de Índices e Range Scans)
-    // -------------------------------------------------------------------------
+    // Auxiliares 
 
-    /**
-     * Percorre as folhas do índice secundário B+ à procura de chaves que
-     * se enquadrem no intervalo matemático da chave composta.
-     */
     private List<LivroAutor> buscarPorIndiceSecundario(
             ArvoreBMais indice,
             int         idFiltro,
@@ -200,15 +164,10 @@ public class LivroAutorDAO {
         return resultado;
     }
 
-    /** Gera a chave composta única: base * MAX_ID + seq */
     private static long chaveComposta(int base, int seq) {
         return ((long) base * MAX_ID) + seq;
     }
 
-    /**
-     * Reindexa os três índices caso o bloco mude de offset (Ex: após um update estrutural).
-     * Otimizado para saltar bytes de blocos excluídos (skipBytes).
-     */
     public void reindexar(int id) throws Exception {
         LivroAutor antigo = buscarPorId(id);
         if (antigo == null) return;
@@ -238,7 +197,7 @@ public class LivroAutorDAO {
                         return;
                     }
                 } else {
-                    raf.skipBytes(tamFisico); // Otimização de RAM
+                    raf.skipBytes(tamFisico);
                 }
             }
         }

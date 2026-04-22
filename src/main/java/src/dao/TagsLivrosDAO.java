@@ -14,17 +14,7 @@ import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
 import src.util.OrdenacaoExterna;
 
-/**
- * DAO da tabela intermediária tags_livros (N:N entre Tags e Livros).
- *
- * Índices mantidos (mesma estratégia do LivroAutorDAO):
- * - indiceId       → B+ por PK (id → offset)       para busca direta.
- * - hashId         → Hash por PK                    para busca O(1).
- * - indicePorTag   → B+ por idTag   (chave composta) para buscar todos os livros de uma tag.
- * - indicePorLivro → B+ por idLivro (chave composta) para buscar todas as tags de um livro.
- *
- * Chave composta: chave = idEstrangeiro * MAX_ID + id (unicidade absoluta sem duplicatas na B+).
- */
+
 public class TagsLivrosDAO {
 
     private static final int MAX_ID = 100_000;
@@ -43,13 +33,9 @@ public class TagsLivrosDAO {
         indicePorLivro = new ArvoreBMais("tags_livros_por_livro");
     }
 
-    // -------------------------------------------------------------------------
-    // CREATE (Vincular)
-    // -------------------------------------------------------------------------
+    // CREATE 
 
-    /**
-     * Cria o vínculo N:N e insere nos quatro índices.
-     */
+
     public boolean vincularTagAoLivro(int idTag, int idLivro) throws Exception {
         TagsLivros novo = new TagsLivros(idTag, idLivro);
         CreateResult cr = arqTagsLivros.create(novo);
@@ -64,9 +50,7 @@ public class TagsLivrosDAO {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // READ
-    // -------------------------------------------------------------------------
 
     public TagsLivros buscarPorId(int id) throws Exception {
         long offset = hashId.buscar(id);
@@ -98,13 +82,9 @@ public class TagsLivrosDAO {
         );
     }
 
-    // -------------------------------------------------------------------------
     // DELETE
-    // -------------------------------------------------------------------------
 
-    /**
-     * Remove um vínculo e limpa os quatro índices.
-     */
+
     public boolean excluirPorId(int id) throws Exception {
         TagsLivros tl = buscarPorId(id);
         if (tl == null) return false;
@@ -159,10 +139,7 @@ public class TagsLivrosDAO {
         return res;
     }
 
-    /**
-     * Ordenação externa por intercalação — ordena os vínculos pelo idTag
-     * sem carregar todos os registros na RAM de uma vez.
-     */
+
     public List<TagsLivros> listarOrdenadoPorIdTag() throws Exception {
         OrdenacaoExterna<TagsLivros> ord = new OrdenacaoExterna<>(
             arqTagsLivros,
@@ -178,9 +155,7 @@ public class TagsLivrosDAO {
         return res;
     }
 
-    // -------------------------------------------------------------------------
-    // Auxiliares (Range Scan e Reindexação)
-    // -------------------------------------------------------------------------
+    // Auxiliares 
 
     private List<TagsLivros> buscarPorIndiceSecundario(
             ArvoreBMais indice,

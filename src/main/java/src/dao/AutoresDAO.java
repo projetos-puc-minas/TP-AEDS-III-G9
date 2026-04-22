@@ -13,20 +13,12 @@ import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
 import src.util.OrdenacaoExterna;
 
-/**
- * DAO de Autores.
- *
- * * Índice B+: chave = id, valor = offset físico no autores.bin.
- *
- * INTEGRIDADE REFERENCIAL:
- * - O método excluirAutor() rejeita a exclusão se houver vínculos na
- * tabela intermédia livros_autores (verificado via LivroAutorDAO).
- */
+
 public class AutoresDAO {
 
     private final Arquivo<Autores> arqAutores;
-    private final ArvoreBMais      indice;   // B+: listagem ordenada
-    private final HashExtensivel   hash;     // Hash: busca direta
+    private final ArvoreBMais      indice;
+    private final HashExtensivel   hash;
     
     // Dependência injetada para garantir a integridade do N:N
     private LivroAutorDAO livroAutorDAO;
@@ -41,9 +33,9 @@ public class AutoresDAO {
         this.livroAutorDAO = livroAutorDAO;
     }
 
-    // -------------------------------------------------------------------------
+    
     // CREATE
-    // -------------------------------------------------------------------------
+    
 
     public int adicionarAutor(Autores autor) throws Exception {
         CreateResult cr = arqAutores.create(autor);
@@ -54,9 +46,7 @@ public class AutoresDAO {
         return cr.id;
     }
 
-    // -------------------------------------------------------------------------
     // READ
-    // -------------------------------------------------------------------------
 
     public Autores buscarAutor(int id) throws Exception {
         long offset = hash.buscar(id); // Hash: O(1) amortizado
@@ -70,9 +60,7 @@ public class AutoresDAO {
         return arqAutores.listarTodos();
     }
 
-    // -------------------------------------------------------------------------
     // UPDATE
-    // -------------------------------------------------------------------------
 
     public boolean alterarAutor(Autores autor) throws Exception {
         boolean ok = arqAutores.update(autor);
@@ -82,14 +70,8 @@ public class AutoresDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
     // DELETE (com Integridade Referencial)
-    // -------------------------------------------------------------------------
 
-    /**
-     * Exclui um autor de forma lógica e atualiza o índice.
-     * Lança IllegalStateException se o autor possuir livros vinculados.
-     */
     public boolean excluirAutor(int id) throws Exception {
         if (livroAutorDAO != null && !livroAutorDAO.buscarLivrosDoAutor(id).isEmpty()) {
             throw new IllegalStateException(
@@ -105,9 +87,7 @@ public class AutoresDAO {
         return ok;
     }
 
-    // -------------------------------------------------------------------------
     // LISTAGEM ORDENADA (via B+)
-    // -------------------------------------------------------------------------
 
     public List<Autores> listarOrdenadoPorId() throws Exception {
         long[][] pares = indice.listarOrdenado();
@@ -140,11 +120,6 @@ public class AutoresDAO {
         }
         return res;
     }
-
-    /**
-     * Ordenação externa por intercalação — ordena autores pelo nome
-     * sem carregar todos os registros na RAM de uma vez.
-     */
     public List<Autores> listarOrdenadoPorNome() throws Exception {
         OrdenacaoExterna<Autores> ord = new OrdenacaoExterna<>(
             arqAutores,
@@ -160,14 +135,8 @@ public class AutoresDAO {
         return res;
     }
 
-    // -------------------------------------------------------------------------
-    // Auxiliar (Otimizado)
-    // -------------------------------------------------------------------------
+    // Auxiliar 
 
-    /**
-     * Varre o ficheiro para encontrar o novo offset físico após um update.
-     * Salta blocos excluídos (lápide falsa) sem os carregar para a memória RAM.
-     */
     private void reindexar(int id) throws Exception {
         try (RandomAccessFile raf = new RandomAccessFile("./data/autores.bin", "r")) {
             raf.seek(Arquivo.TAM_CABECALHO);

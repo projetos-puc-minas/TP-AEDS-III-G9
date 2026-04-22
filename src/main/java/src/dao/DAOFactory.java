@@ -2,14 +2,12 @@ package src.dao;
 
 import src.service.UsuarioService;
 
-/**
- * Fábrica Central de DAOs (Data Access Objects).
- *
- * Atua como um contêiner de Injeção de Dependências (DI), garantindo que
- * todas as partes do sistema (como o ApiServer) utilizem exatamente as
- * mesmas instâncias em memória, evitando concorrência nos arquivos físicos.
- * É nesta classe que as restrições de Integridade Referencial são "amarradas".
- */
+// Fábrica Central de DAOs (Data Access Objects).
+// Atua como um contêiner de Injeção de Dependências (DI), garantindo que
+//todas as partes do sistema (como o ApiServer) utilizem exatamente as
+//mesmas instâncias em memória, evitando concorrência nos arquivos físicos.
+// nesta classe que as restrições de Integridade Referencial são "amarradas".
+
 public class DAOFactory {
 
     private final EditoraDAO     editoraDAO;
@@ -40,10 +38,9 @@ public class DAOFactory {
         // AutoresDAO bloqueia exclusão se houver vínculos na tabela livros_autores
         this.autoresDAO.setLivroAutorDAO(this.livroAutorDAO);
 
-        // LivroDAO verifica vínculos em livros_autores antes de excluir
-        // e remove em cascata os vínculos em tags_livros
+        // LivroDAO verifica vínculos em livros_autores antes de excluir e remove em cascata os vínculos em tags_livros
         this.livroDAO.setLivroAutorDAO(this.livroAutorDAO);
-        this.livroDAO.setTagsLivrosDAO(this.tagsLivrosDAO); // NOVO
+        this.livroDAO.setTagsLivrosDAO(this.tagsLivrosDAO); 
 
         // TagDAO bloqueia exclusão se houver livros vinculados (integridade N:N)
         this.tagDAO.setTagsLivrosDAO(this.tagsLivrosDAO);
@@ -52,9 +49,7 @@ public class DAOFactory {
         this.usuarioService = new UsuarioService(this.usuarioDAO);
     }
 
-    // -------------------------------------------------------------------------
-    // Getters — Acesso centralizado para os handlers da API
-    // -------------------------------------------------------------------------
+    // Getters 
 
     public EditoraDAO     getEditoraDAO()     { return this.editoraDAO; }
     public AutoresDAO     getAutoresDAO()     { return this.autoresDAO; }

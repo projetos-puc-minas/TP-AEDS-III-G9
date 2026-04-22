@@ -1,5 +1,3 @@
-
-
 const API = '';  // mesmo host — requests vão para /api/...
 
 //  ESTADO GLOBAL
@@ -97,12 +95,12 @@ async function loadTable(section) {
   const order = currentOrder[section] || 'asc';
   const endpointMap = {
     livros:         `/api/livros${order === 'desc' ? '?ordem=id-desc' : ''}`,
-    autores:        '/api/autores',
-    editoras:       '/api/editoras',
+    autores:        `/api/autores${order === 'desc' ? '?ordem=id-desc' : ''}`,
+    editoras:       `/api/editoras${order === 'desc' ? '?ordem=id-desc' : ''}`,
     livros_autores: '/api/livros-autores',
     tags:           `/api/tags${order === 'desc' ? '?ordem=id-desc' : ''}`,
     tags_livros:    '/api/tags-livros',
-    usuarios:       '/api/usuarios',
+    usuarios:       `/api/usuarios${order === 'desc' ? '?ordem=id-desc' : ''}`,
   };
 
   const tbodyMap = {
@@ -246,6 +244,36 @@ function setOrder(section, order, btnEl) {
   if (parent) parent.querySelectorAll('.order-btn').forEach(b => b.classList.remove('active'));
   btnEl.classList.add('active');
   loadTable(section);
+}
+
+//  ORDENAÇÃO POR NOME/TÍTULO via Intercalação Externa
+const _nomeOrderConfig = {
+  livros:   { endpoint: '/api/livros?ordem=titulo',   tbody: 'livros-tbody',    cols: 9, label: 'título' },
+  autores:  { endpoint: '/api/autores?ordem=nome',    tbody: 'autores-tbody',   cols: 6, label: 'nome'   },
+  editoras: { endpoint: '/api/editoras?ordem=nome',   tbody: 'editoras-tbody',  cols: 5, label: 'nome'   },
+  usuarios: { endpoint: '/api/usuarios?ordem=nome',   tbody: 'usuarios-tbody',  cols: 5, label: 'nome'   },
+};
+
+async function loadNomeOrder(section) {
+  // Marca o botão "Az Nome" como ativo e desmarca os outros
+  const page = document.getElementById('page-' + section);
+  if (page) page.querySelectorAll('.order-btn').forEach(b => b.classList.remove('active'));
+  if (event && event.target) event.target.classList.add('active');
+
+  const cfg = _nomeOrderConfig[section];
+  if (!cfg) return;
+
+  const tbody = document.getElementById(cfg.tbody);
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="${cfg.cols}"><span class="spinner"></span>Ordenando por intercalação...</td></tr>`;
+  try {
+    const data = await apiFetch(cfg.endpoint);
+    renderRows(section, tbody, data);
+    toast(`Ordenado por ${cfg.label} via Intercalação Externa (3d-1)`, false, true);
+  } catch (e) {
+    toast(e.message, true);
+  }
 }
 
 //  SELECTS DINÂMICOS — Livros-Autores e Tags-Livros

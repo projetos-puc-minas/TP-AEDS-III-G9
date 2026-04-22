@@ -6,30 +6,10 @@ import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Gerenciador genérico de arquivo binário com suporte a:
- * - Cabeçalho fixo de 16 bytes
- * - Exclusão lógica via lápide
- * - Reaproveitamento de espaço via lista encadeada best-fit ordenada por tamanho
- *
- * Layout do cabeçalho (16 bytes):
- *   [0..3]  int   ultimo_id              — maior ID já gerado
- *   [4..7]  int   total_registros        — quantidade de registros ativos
- *   [8..15] long  ponteiro_lista_excluidos — offset do 1º bloco livre (-1 = vazia)
- *
- * Layout de cada registro no arquivo:
- *   [0]     boolean  lapide        — true = ativo, false = excluído logicamente
- *   [1..4]  int      tam_registro  — tamanho físico do bloco reservado (em bytes)
- *   [5..]   byte[]   dados         — conteúdo serializado pelo próprio objeto
- *
- * Registros excluídos armazenam, nos primeiros 8 bytes de "dados",
- * o ponteiro (offset) para o próximo bloco excluído da lista encadeada.
- */
+
 public class Arquivo<T extends Registro> {
 
-    // ------------------------------------------------------------------
     // Constantes — offsets fixos do cabeçalho
-    // ------------------------------------------------------------------
     public  static final int  TAM_CABECALHO     = 16;
     private static final int  OFFSET_ULTIMO_ID  = 0;
     private static final int  OFFSET_TOTAL_REG  = 4;
@@ -52,17 +32,8 @@ public class Arquivo<T extends Registro> {
     private final RandomAccessFile arquivo;
     private final Constructor<T>   construtor;
 
-    // ------------------------------------------------------------------
     // Construtor
-    // ------------------------------------------------------------------
 
-    /**
-     * Abre (ou cria) o arquivo binário na pasta ./data/.
-     * Se o arquivo for novo, escreve o cabeçalho inicial zerado.
-     *
-     * @param nomeArquivo nome base do arquivo (sem extensão)
-     * @param construtor  construtor padrão (sem parâmetros) da classe T
-     */
     public Arquivo(String nomeArquivo, Constructor<T> construtor) throws Exception {
         File dir = new File("./data");
         if (!dir.exists()) dir.mkdirs();
@@ -79,9 +50,7 @@ public class Arquivo<T extends Registro> {
         }
     }
 
-    // ------------------------------------------------------------------
     // Classe auxiliar para retornar id + endereço físico após criação
-    // ------------------------------------------------------------------
 
     public static class CreateResult {
         public final int  id;
@@ -93,17 +62,8 @@ public class Arquivo<T extends Registro> {
         }
     }
 
-    // ------------------------------------------------------------------
     // CRUD
-    // ------------------------------------------------------------------
 
-    /**
-     * Insere um novo registro no arquivo.
-     * Tenta reaproveitar um bloco excluído (best-fit); caso não encontre,
-     * acrescenta ao final do arquivo.
-     *
-     * @return CreateResult com o novo ID atribuído e o offset físico do registro
-     */
     public CreateResult create(T obj) throws Exception {
         // Incrementa e obtém o próximo ID sequencial
         arquivo.seek(OFFSET_ULTIMO_ID);
@@ -146,13 +106,7 @@ public class Arquivo<T extends Registro> {
         return new CreateResult(novoID, endereco);
     }
 
-    /**
-     * Lê um registro diretamente pelo seu offset físico no arquivo.
-     * Útil para acesso via índice (hash ou B+), que armazena offsets.
-     *
-     * @param offset posição absoluta no arquivo
-     * @return objeto desserializado, ou null se o offset for inválido ou o registro estiver excluído
-     */
+
     public T readByOffset(long offset) throws Exception {
         if (offset == NULO || offset < TAM_CABECALHO) return null;
 
@@ -175,14 +129,7 @@ public class Arquivo<T extends Registro> {
         return obj;
     }
 
-    /**
-     * Busca linear por ID no arquivo inteiro.
-     * Utilizado na Fase 1 (sem índice); nas fases seguintes será substituído
-     * pela busca via Hash Extensível ou Árvore B+.
-     *
-     * @param id identificador do registro procurado
-     * @return objeto encontrado, ou null se não existir
-     */
+
     public T read(int id) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
@@ -206,18 +153,6 @@ public class Arquivo<T extends Registro> {
         return null;
     }
 
-    /**
-     * Atualiza um registro existente (identificado por novoObj.getId()).
-     *
-     * Se os novos dados couberem no bloco atual, sobrescreve no lugar.
-     * Se os novos dados forem maiores, marca o bloco atual como excluído,
-     * devolve-o à lista de espaços livres e insere o registro em um novo local.
-     *
-     * Nota: total_registros não é alterado — o registro continua existindo,
-     * apenas muda de posição física quando necessário.
-     *
-     * @return true se o registro foi encontrado e atualizado; false caso contrário
-     */
     public boolean update(T novoObj) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
@@ -281,12 +216,6 @@ public class Arquivo<T extends Registro> {
         return false;
     }
 
-    /**
-     * Exclui logicamente um registro pelo ID, marcando sua lápide como false
-     * e reinserindo o bloco na lista de espaços livres (best-fit).
-     *
-     * @return true se encontrado e excluído; false se o ID não existir
-     */
     public boolean delete(int id) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
@@ -314,9 +243,7 @@ public class Arquivo<T extends Registro> {
         return false;
     }
 
-    // ------------------------------------------------------------------
     // Métodos auxiliares de cabeçalho
-    // ------------------------------------------------------------------
 
     /** Retorna o último ID gerado (não necessariamente o maior ID ativo). */
     public int getUltimoId() throws Exception {
@@ -342,20 +269,8 @@ public class Arquivo<T extends Registro> {
         arquivo.writeInt(total + delta);
     }
 
-    // ------------------------------------------------------------------
     // Gerenciamento da lista de excluídos (best-fit ordenado por tamanho)
-    // ------------------------------------------------------------------
 
-    /**
-     * Insere um bloco recém-excluído na lista encadeada de espaços livres.
-     * A lista é mantida ordenada em ordem crescente de tamanho (best-fit).
-     *
-     * O ponteiro para o próximo bloco da lista é gravado nos primeiros
-     * 8 bytes da área de dados do registro excluído.
-     *
-     * @param tamBloco tamanho físico do bloco excluído
-     * @param posBloco offset absoluto do bloco excluído no arquivo
-     */
     private void addDeleted(int tamBloco, long posBloco) throws Exception {
         arquivo.seek(OFFSET_LISTA_EXC);
         long posAnterior = NULO;
@@ -386,16 +301,6 @@ public class Arquivo<T extends Registro> {
         arquivo.writeLong(posBloco);
     }
 
-    /**
-     * Busca e remove da lista o menor bloco excluído que comporte
-     * {@code tamanhoNecessario} bytes (estratégia best-fit).
-     *
-     * Como a lista está ordenada por tamanho crescente, o primeiro bloco
-     * com tamanho >= tamanhoNecessario já é o melhor candidato.
-     *
-     * @param tamanhoNecessario tamanho mínimo em bytes que o bloco deve ter
-     * @return offset do bloco encontrado, ou NULO se nenhum for adequado
-     */
     private long getDeleted(int tamanhoNecessario) throws Exception {
         arquivo.seek(OFFSET_LISTA_EXC);
         long posAnterior = NULO;
@@ -426,15 +331,8 @@ public class Arquivo<T extends Registro> {
         return NULO; // Nenhum bloco adequado encontrado
     }
 
-    // ------------------------------------------------------------------
     // Listagem e encerramento
-    // ------------------------------------------------------------------
 
-    /**
-     * Retorna todos os registros ativos do arquivo em ordem de inserção física.
-     * Utilizado na Fase 1 e como fonte para a ordenação externa por intercalação.
-     * A listagem ordenada por atributo será feita via travessia da Árvore B+ (Fase 2+).
-     */
     public List<T> listarTodos() throws Exception {
         List<T> lista = new ArrayList<>();
         arquivo.seek(TAM_CABECALHO);
@@ -457,14 +355,8 @@ public class Arquivo<T extends Registro> {
         return lista;
     }
 
-    // ------------------------------------------------------------------
-    // Suporte a índices — Fases 2 e 3
-    // ------------------------------------------------------------------
+    // Suporte a índices 
 
-    /**
-     * Par (objeto, offset físico) retornado por {@link #listarComOffset()}.
-     * Usado pela ordenação externa por intercalação e pela carga inicial do Hash.
-     */
     public static class OffsetEntry<T> {
         public final T    objeto;
         public final long offset;
@@ -475,14 +367,6 @@ public class Arquivo<T extends Registro> {
         }
     }
 
-    /**
-     * Varre o arquivo e retorna cada registro ativo junto com seu offset físico.
-     *
-     * Uso principal:
-     * - Carga inicial do Hash Extensível: popula id → offset para todos os registros.
-     * - Ordenação externa por intercalação: precisa do offset para reescrever blocos
-     *   ou para que a B+ aponte diretamente para a posição correta no .bin.
-     */
     public List<OffsetEntry<T>> listarComOffset() throws Exception {
         List<OffsetEntry<T>> lista = new ArrayList<>();
         arquivo.seek(TAM_CABECALHO);
@@ -505,15 +389,7 @@ public class Arquivo<T extends Registro> {
         return lista;
     }
 
-    /**
-     * Retorna o offset físico de um registro pelo seu ID, via varredura linear.
-     *
-     * Utilizado uma única vez para popular o Hash Extensível na primeira carga.
-     * Após isso, todas as buscas por ID devem passar pelo hash (O(1) amortizado).
-     *
-     * @param id identificador do registro
-     * @return offset absoluto no arquivo, ou NULO se o ID não existir
-     */
+
     public long getOffsetById(int id) throws Exception {
         arquivo.seek(TAM_CABECALHO);
 
@@ -533,21 +409,6 @@ public class Arquivo<T extends Registro> {
         return NULO;
     }
 
-    /**
-     * Atualiza um registro diretamente pelo seu offset físico, sem varredura.
-     *
-     * Chamado quando o Hash Extensível ou a Árvore B+ já forneceu o offset exato,
-     * evitando percorrer o arquivo inteiro.
-     *
-     * Regras de reaproveitamento são as mesmas do {@link #update}:
-     * - Se caber no bloco atual, sobrescreve no lugar.
-     * - Se não couber, marca o bloco como excluído e realoca em outro lugar.
-     *   Nesse caso retorna o novo offset para que o índice possa ser atualizado.
-     *
-     * @param offset  offset físico atual do registro
-     * @param novoObj objeto com os dados atualizados (deve ter o mesmo ID)
-     * @return offset físico final do registro (pode ser diferente do original se realocado)
-     */
     public long updateByOffset(long offset, T novoObj) throws Exception {
         if (offset == NULO || offset < TAM_CABECALHO) return NULO;
 
@@ -599,15 +460,7 @@ public class Arquivo<T extends Registro> {
         return novoOffset;
     }
 
-    /**
-     * Exclui logicamente um registro diretamente pelo seu offset físico.
-     *
-     * Chamado quando o Hash Extensível ou a Árvore B+ já localizou o bloco,
-     * tornando desnecessária a varredura que o {@link #delete(int)} faz.
-     *
-     * @param offset offset físico do registro a excluir
-     * @param tam    tamanho físico do bloco (lido pelo índice ou passado pelo chamador)
-     */
+
     public void deleteByOffset(long offset, int tam) throws Exception {
         if (offset == NULO || offset < TAM_CABECALHO) return;
 

@@ -10,15 +10,7 @@ import src.util.DataUtil;
 import src.util.Registro;
 import src.util.SerializadorUtil;
 
-/**
- * Modelo de Autor.
- * * Representa os autores dos livros no sistema.
- * * A data de nascimento é armazenada como um timestamp Unix em milissegundos (long, 8 bytes)
- * para garantir precisão e segurança contra problemas de fuso horário, sendo formatada
- * na leitura através do utilitário DataUtil.
- * * A serialização de Strings (nome, biografia) é gerida de forma segura
- * através do SerializadorUtil, utilizando o delimitador ';'.
- */
+
 public class Autores implements Registro {
 
     private boolean lapide;
@@ -28,9 +20,7 @@ public class Autores implements Registro {
     private long    dataNascimento; // Armazenado como timestamp Unix em milissegundos
     private String  biografia;
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public Autores() {
         this(-1, "", 0L, "");
@@ -48,9 +38,7 @@ public class Autores implements Registro {
         this.biografia      = biografia;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -61,9 +49,7 @@ public class Autores implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public String getNome()                            { return nome; }
     public void   setNome(String nome)                 { this.nome = nome; }
@@ -79,9 +65,7 @@ public class Autores implements Registro {
     public String getBiografia()                       { return biografia; }
     public void   setBiografia(String biografia)       { this.biografia = biografia; }
 
-    // -------------------------------------------------------------------------
     // Serialização (Padrão do Projeto)
-    // -------------------------------------------------------------------------
 
     @Override
     public byte[] toByteArray() throws IOException {
@@ -107,9 +91,7 @@ public class Autores implements Registro {
         this.biografia      = SerializadorUtil.readString(dis);
     }
 
-    // -------------------------------------------------------------------------
     // Impressão Formatada
-    // -------------------------------------------------------------------------
 
     @Override
     public String toString() {

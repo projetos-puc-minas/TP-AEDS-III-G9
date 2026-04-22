@@ -9,12 +9,7 @@ import java.io.IOException;
 import src.util.Registro;
 import src.util.SerializadorUtil;
 
-/**
- * Modelo de Editora.
- * * Atua como o lado "1" no relacionamento 1:N com a entidade Livro.
- * * Toda a serialização de Strings (nome, cidade) é gerida de forma segura
- * através do SerializadorUtil, utilizando o delimitador ';'.
- */
+
 public class Editora implements Registro {
 
     private boolean lapide;
@@ -22,11 +17,9 @@ public class Editora implements Registro {
     private int     id;
     private String  nome;
     private String  cidade;
-    private int     anoFundacao; // Atualizado para o padrão CamelCase
+    private int     anoFundacao; 
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public Editora() {
         this(-1, "", "", 0);
@@ -44,9 +37,7 @@ public class Editora implements Registro {
         this.anoFundacao = anoFundacao;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -57,9 +48,7 @@ public class Editora implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public String getNome()                    { return nome; }
     public void   setNome(String nome)         { this.nome = nome; }
@@ -70,9 +59,7 @@ public class Editora implements Registro {
     public int    getAnoFundacao()             { return anoFundacao; }
     public void   setAnoFundacao(int ano)      { this.anoFundacao = ano; }
 
-    // -------------------------------------------------------------------------
-    // Serialização (Padrão do Projeto)
-    // -------------------------------------------------------------------------
+    // Serialização 
 
     @Override
     public byte[] toByteArray() throws IOException {
@@ -98,9 +85,7 @@ public class Editora implements Registro {
         this.anoFundacao = dis.readInt();
     }
 
-    // -------------------------------------------------------------------------
     // Impressão Formatada
-    // -------------------------------------------------------------------------
 
     @Override
     public String toString() {

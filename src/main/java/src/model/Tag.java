@@ -9,12 +9,7 @@ import java.io.IOException;
 import src.util.Registro;
 import src.util.SerializadorUtil;
 
-/**
- * Modelo de Tag.
- *
- * Representa as categorias/etiquetas que podem ser associadas a livros.
- * Segue exatamente o padrão de serialização do projeto (SerializadorUtil com delimitador ';').
- */
+
 public class Tag implements Registro {
 
     private boolean lapide;
@@ -22,9 +17,7 @@ public class Tag implements Registro {
     private int     id;
     private String  nome;
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public Tag() {
         this(-1, "");
@@ -40,9 +33,7 @@ public class Tag implements Registro {
         this.nome   = nome;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -53,16 +44,12 @@ public class Tag implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public String getNome()            { return nome; }
     public void   setNome(String nome) { this.nome = nome; }
 
-    // -------------------------------------------------------------------------
     // Serialização (Padrão do Projeto)
-    // -------------------------------------------------------------------------
 
     @Override
     public byte[] toByteArray() throws IOException {
@@ -84,9 +71,7 @@ public class Tag implements Registro {
         this.nome = SerializadorUtil.readString(dis);
     }
 
-    // -------------------------------------------------------------------------
     // Impressão Formatada
-    // -------------------------------------------------------------------------
 
     @Override
     public String toString() {

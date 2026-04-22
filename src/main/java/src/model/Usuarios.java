@@ -9,15 +9,7 @@ import java.io.IOException;
 import src.util.Registro;
 import src.util.SerializadorUtil;
 
-/**
- * Modelo de Utilizador do sistema.
- *
- * A senha é armazenada de forma segura utilizando criptografia XOR.
- *
- * CAMPO MULTIVALORADO: redesSociais (String[])
- * Segue o mesmo padrão de serialização do campo generos em Livro,
- * usando SerializadorUtil.writeStringArray / readStringArray.
- */
+
 public class Usuarios implements Registro {
 
     private boolean  lapide;
@@ -28,9 +20,7 @@ public class Usuarios implements Registro {
     private String   senhaXor;       // Armazenada criptografada em Base64
     private String[] redesSociais;   // Campo multivalorado — ex: ["instagram.com/user", "twitter.com/user"]
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public Usuarios() {
         this(-1, "", "", "", new String[0]);
@@ -53,9 +43,7 @@ public class Usuarios implements Registro {
         this.redesSociais = redesSociais != null ? redesSociais : new String[0];
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -66,9 +54,7 @@ public class Usuarios implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public String   getNome()                           { return nome; }
     public void     setNome(String nome)                { this.nome = nome; }
@@ -82,9 +68,7 @@ public class Usuarios implements Registro {
     public String[] getRedesSociais()                   { return redesSociais; }
     public void     setRedesSociais(String[] rs)        { this.redesSociais = rs != null ? rs : new String[0]; }
 
-    // -------------------------------------------------------------------------
-    // Serialização — campo redesSociais usa writeStringArray/readStringArray
-    // -------------------------------------------------------------------------
+    // Serialização 
 
     @Override
     public byte[] toByteArray() throws IOException {

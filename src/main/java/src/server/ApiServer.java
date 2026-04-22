@@ -573,9 +573,7 @@ public class ApiServer {
         }
     }
 
-    // -------------------------------------------------------------------------
     // AUXILIARES
-    // -------------------------------------------------------------------------
 
     private static int extractId(HttpExchange ex) {
         String[] parts = ex.getRequestURI().getPath().split("/");

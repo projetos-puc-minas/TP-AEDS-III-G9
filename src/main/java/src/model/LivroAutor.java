@@ -8,11 +8,7 @@ import java.io.IOException;
 
 import src.util.Registro;
 
-/**
- * Modelo da Tabela Intermediária (Relacionamento N:N).
- * * Vincula um Livro a um Autor através das suas chaves estrangeiras (idLivro e idAutor).
- * Como contém apenas números inteiros, o seu tamanho após a serialização é fixo (12 bytes de dados).
- */
+
 public class LivroAutor implements Registro {
 
     private boolean lapide;
@@ -21,9 +17,7 @@ public class LivroAutor implements Registro {
     private int     idLivro;
     private int     idAutor;
 
-    // -------------------------------------------------------------------------
     // Construtores
-    // -------------------------------------------------------------------------
 
     public LivroAutor() {
         this(-1, -1, -1);
@@ -40,9 +34,7 @@ public class LivroAutor implements Registro {
         this.idAutor = idAutor;
     }
 
-    // -------------------------------------------------------------------------
     // Implementação da Interface Registro
-    // -------------------------------------------------------------------------
 
     @Override public void    setLapide(boolean lapide) { this.lapide = lapide; }
     @Override public boolean getLapide()               { return this.lapide; }
@@ -53,9 +45,7 @@ public class LivroAutor implements Registro {
     @Override public void    setId(int id)             { this.id = id; }
     @Override public int     getId()                   { return this.id; }
 
-    // -------------------------------------------------------------------------
     // Getters e Setters
-    // -------------------------------------------------------------------------
 
     public int  getIdLivro()               { return idLivro; }
     public void setIdLivro(int idLivro)    { this.idLivro = idLivro; }
@@ -63,9 +53,7 @@ public class LivroAutor implements Registro {
     public int  getIdAutor()               { return idAutor; }
     public void setIdAutor(int idAutor)    { this.idAutor = idAutor; }
 
-    // -------------------------------------------------------------------------
-    // Serialização (Otimizada para Tamanho Fixo)
-    // -------------------------------------------------------------------------
+    // Serialização 
 
     @Override
     public byte[] toByteArray() throws IOException {

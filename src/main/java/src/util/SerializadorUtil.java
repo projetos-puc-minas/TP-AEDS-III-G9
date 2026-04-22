@@ -3,18 +3,7 @@ package src.util;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Utilitários de serialização para arquivos binários.
- *
- * PADRÃO ADOTADO (único em todo o projeto):
- * - String   → bytes UTF-8 + 1 byte delimitador ';' (compatível com a documentação)
- * - char[13] → (ISBN) 13 bytes fixos
- * - String[] → 4 bytes (quantidade) + cada String no padrão acima
- * - int[]    → 4 bytes (quantidade) + cada int (4 bytes)
- *
- * NÃO usar writeUTF/readUTF em nenhuma entidade do projeto — incompatível
- * com o formato acima e com o esquema binário documentado.
- */
+
 public final class SerializadorUtil {
 
     private static final byte DELIMITADOR = (byte) ';';
@@ -22,9 +11,7 @@ public final class SerializadorUtil {
     // Construtor privado para evitar instanciação de classe utilitária
     private SerializadorUtil() {}
 
-    // -------------------------------------------------------------------------
     // String
-    // -------------------------------------------------------------------------
 
     public static void writeString(DataOutputStream dos, String valor) throws IOException {
         if (valor == null) valor = "";
@@ -41,9 +28,7 @@ public final class SerializadorUtil {
         return buffer.toString(StandardCharsets.UTF_8);
     }
 
-    // -------------------------------------------------------------------------
     // ISBN — campo fixo de 13 bytes
-    // -------------------------------------------------------------------------
 
     public static void writeIsbn(DataOutputStream dos, char[] isbn) throws IOException {
         byte[] bytes = new byte[13];
@@ -65,9 +50,7 @@ public final class SerializadorUtil {
         return isbn;
     }
 
-    // -------------------------------------------------------------------------
-    // String[] — campo multivalorado (ex.: géneros ou tags embutidas)
-    // -------------------------------------------------------------------------
+    // String[] — campo multivalorado 
 
     public static void writeStringArray(DataOutputStream dos, String[] valores) throws IOException {
         if (valores == null) {
@@ -89,9 +72,7 @@ public final class SerializadorUtil {
         return valores;
     }
 
-    // -------------------------------------------------------------------------
     // int[]
-    // -------------------------------------------------------------------------
 
     public static void writeIntArray(DataOutputStream dos, int[] valores) throws IOException {
         if (valores == null) {
