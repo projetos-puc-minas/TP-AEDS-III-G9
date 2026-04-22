@@ -95,12 +95,12 @@ async function loadTable(section) {
   const order = currentOrder[section] || 'asc';
   const endpointMap = {
     livros:         `/api/livros${order === 'desc' ? '?ordem=id-desc' : ''}`,
-    autores:        `/api/autores${order === 'desc' ? '?ordem=id-desc' : ''}`,
-    editoras:       `/api/editoras${order === 'desc' ? '?ordem=id-desc' : ''}`,
+    autores:        '/api/autores',
+    editoras:       '/api/editoras',
     livros_autores: '/api/livros-autores',
     tags:           `/api/tags${order === 'desc' ? '?ordem=id-desc' : ''}`,
     tags_livros:    '/api/tags-livros',
-    usuarios:       `/api/usuarios${order === 'desc' ? '?ordem=id-desc' : ''}`,
+    usuarios:       '/api/usuarios',
   };
 
   const tbodyMap = {
@@ -227,14 +227,62 @@ function renderRows(section, tbody, data) {
   tbody.innerHTML = data.map(r => `<tr>${renderer(r)}</tr>`).join('');
 }
 
-//  FILTRO INLINE
-function filterTable(tbodyId, query) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  const q = query.toLowerCase();
-  tbody.querySelectorAll('tr').forEach(row => {
-    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
+//  BUSCA POR HASH EXTENSÍVEL — O(1) amortizado
+const _hashEndpointMap = {
+  livros:         (id) => `/api/livros/${id}`,
+  autores:        (id) => `/api/autores/${id}`,
+  editoras:       (id) => `/api/editoras/${id}`,
+  livros_autores: (id) => `/api/livros-autores/${id}`,
+  tags:           (id) => `/api/tags/${id}`,
+  tags_livros:    (id) => `/api/tags-livros/${id}`,
+  usuarios:       (id) => `/api/usuarios/${id}`,
+};
+
+const _hashTbodyMap = {
+  livros:         'livros-tbody',
+  autores:        'autores-tbody',
+  editoras:       'editoras-tbody',
+  livros_autores: 'livros-autores-tbody',
+  tags:           'tags-tbody',
+  tags_livros:    'tags-livros-tbody',
+  usuarios:       'usuarios-tbody',
+};
+
+const _hashCols = {
+  livros: 9, autores: 6, editoras: 5,
+  livros_autores: 4, tags: 3, tags_livros: 4, usuarios: 5
+};
+
+async function buscarPorHash(section) {
+  const input = document.getElementById(`${section}-hash-input`);
+  const id    = input ? parseInt(input.value) : NaN;
+
+  if (!id || id < 1) {
+    toast('Digite um ID válido para buscar', true);
+    return;
+  }
+
+  const tbody = document.getElementById(_hashTbodyMap[section]);
+  const cols  = _hashCols[section] || 6;
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="${cols}"><span class="spinner"></span>Consultando Hash Extensível...</td></tr>`;
+
+  try {
+    const record = await apiGet(_hashEndpointMap[section](id));
+    // A API retorna objeto único — envolve em array para renderRows
+    renderRows(section, tbody, [record]);
+
+    // Destaca a linha encontrada
+    const row = tbody.querySelector('tr');
+    if (row) {
+      row.classList.add('hash-result-row');
+      setTimeout(() => row.classList.remove('hash-result-row'), 2500);
+    }
+
+    toast(`Registro #${id} localizado via Hash Extensível — O(1)`, false, true);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="empty-icon">🔍</div><p>Nenhum registro encontrado com ID #${id}</p></div></td></tr>`;
+    toast(`ID #${id} não encontrado`, true);
+  }
 }
 
 //  ORDENAÇÃO (Árvore B+ crescente / decrescente)
@@ -244,36 +292,6 @@ function setOrder(section, order, btnEl) {
   if (parent) parent.querySelectorAll('.order-btn').forEach(b => b.classList.remove('active'));
   btnEl.classList.add('active');
   loadTable(section);
-}
-
-//  ORDENAÇÃO POR NOME/TÍTULO via Intercalação Externa
-const _nomeOrderConfig = {
-  livros:   { endpoint: '/api/livros?ordem=titulo',   tbody: 'livros-tbody',    cols: 9, label: 'título' },
-  autores:  { endpoint: '/api/autores?ordem=nome',    tbody: 'autores-tbody',   cols: 6, label: 'nome'   },
-  editoras: { endpoint: '/api/editoras?ordem=nome',   tbody: 'editoras-tbody',  cols: 5, label: 'nome'   },
-  usuarios: { endpoint: '/api/usuarios?ordem=nome',   tbody: 'usuarios-tbody',  cols: 5, label: 'nome'   },
-};
-
-async function loadNomeOrder(section) {
-  // Marca o botão "Az Nome" como ativo e desmarca os outros
-  const page = document.getElementById('page-' + section);
-  if (page) page.querySelectorAll('.order-btn').forEach(b => b.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
-
-  const cfg = _nomeOrderConfig[section];
-  if (!cfg) return;
-
-  const tbody = document.getElementById(cfg.tbody);
-  if (!tbody) return;
-
-  tbody.innerHTML = `<tr class="loading-row"><td colspan="${cfg.cols}"><span class="spinner"></span>Ordenando por intercalação...</td></tr>`;
-  try {
-    const data = await apiFetch(cfg.endpoint);
-    renderRows(section, tbody, data);
-    toast(`Ordenado por ${cfg.label} via Intercalação Externa (3d-1)`, false, true);
-  } catch (e) {
-    toast(e.message, true);
-  }
 }
 
 //  SELECTS DINÂMICOS — Livros-Autores e Tags-Livros

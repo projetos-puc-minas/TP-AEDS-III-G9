@@ -71,10 +71,7 @@
       <span>›</span>
       <span class="current" id="breadcrumb-current">Dashboard</span>
     </div>
-    <div class="search-box">
-      <span>🔍</span>
-      <input type="text" placeholder="Pesquisar na tabela…" oninput="filterCurrentTable(this.value)">
-    </div>
+
     <div class="topbar-actions">
       <div class="icon-btn" id="theme-toggle" title="Alternar tema" onclick="toggleTheme()">☀️</div>
       <div class="icon-btn" title="Recarregar" onclick="reloadCurrent()">↻</div>
@@ -158,9 +155,11 @@
         <button class="btn btn-primary" onclick="openModal('livros')">＋ Novo Livro</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar livros…" oninput="filterTable('livros-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="livros-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('livros')">
+          <button class="btn btn-hash" onclick="buscarPorHash('livros')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('livros')" title="Limpar busca">✕</button>
         </div>
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('livros','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
@@ -189,14 +188,16 @@
       <div class="page-header">
         <div>
           <div class="page-title">Autores</div>
-          <div class="page-subtitle">Cadastro de autores — ordenação via Árvore B+ e Intercalação Externa</div>
+          <div class="page-subtitle">Cadastro de autores do acervo</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('autores')">＋ Novo Autor</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar autores…" oninput="filterTable('autores-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="autores-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('autores')">
+          <button class="btn btn-hash" onclick="buscarPorHash('autores')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('autores')" title="Limpar busca">✕</button>
         </div>
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('autores','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
@@ -222,14 +223,16 @@
       <div class="page-header">
         <div>
           <div class="page-title">Editoras</div>
-          <div class="page-subtitle">Gerenciamento de editoras — ordenação via Árvore B+ e Intercalação Externa</div>
+          <div class="page-subtitle">Gerenciamento de editoras — chave estrangeira dos Livros (1:N)</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('editoras')">＋ Nova Editora</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar editoras…" oninput="filterTable('editoras-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="editoras-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('editoras')">
+          <button class="btn btn-hash" onclick="buscarPorHash('editoras')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('editoras')" title="Limpar busca">✕</button>
         </div>
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('editoras','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
@@ -261,9 +264,11 @@
         <button class="btn btn-primary" onclick="openModal('livros_autores')">＋ Novo Vínculo</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar vínculos…" oninput="filterTable('livros-autores-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="livros_autores-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('livros_autores')">
+          <button class="btn btn-hash" onclick="buscarPorHash('livros_autores')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('livros_autores')" title="Limpar busca">✕</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('livros_autores')">↻</button>
       </div>
@@ -289,13 +294,16 @@
         <button class="btn btn-primary" onclick="openModal('tags')">＋ Nova Tag</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar tags…" oninput="filterTable('tags-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="tags-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('tags')">
+          <button class="btn btn-hash" onclick="buscarPorHash('tags')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('tags')" title="Limpar busca">✕</button>
         </div>
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('tags','asc',this)" title="Crescente — Travessia das folhas da Árvore B+ (3d-2)">↑ Asc</button>
           <button class="order-btn" onclick="setOrder('tags','desc',this)" title="Decrescente — Travessia inversa das folhas da Árvore B+ (3d-2)">↓ Desc</button>
+          <button class="order-btn" onclick="loadNomeOrder('tags')" title="Por Nome — Ordenação por Intercalação (3d-1)">Az Nome</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('tags')">↻</button>
       </div>
@@ -322,9 +330,11 @@
         <button class="btn btn-primary" onclick="openModal('tags_livros')">＋ Novo Vínculo</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar vínculos…" oninput="filterTable('tags-livros-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="tags_livros-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('tags_livros')">
+          <button class="btn btn-hash" onclick="buscarPorHash('tags_livros')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('tags_livros')" title="Limpar busca">✕</button>
         </div>
         <button class="btn btn-ghost" onclick="loadTable('tags_livros')">↻</button>
       </div>
@@ -346,14 +356,16 @@
       <div class="page-header">
         <div>
           <div class="page-title">Usuários</div>
-          <div class="page-subtitle">Contas de acesso — ordenação via Árvore B+ e Intercalação Externa</div>
+          <div class="page-subtitle">Contas de acesso com senha criptografada via XOR e redes sociais</div>
         </div>
         <button class="btn btn-primary" onclick="openModal('usuarios')">＋ Novo Usuário</button>
       </div>
       <div class="toolbar">
-        <div class="search-inline">
-          <span>🔍</span>
-          <input type="text" placeholder="Filtrar usuários…" oninput="filterTable('usuarios-tbody', this.value)">
+        <div class="hash-search">
+          <span class="hash-icon">⚡</span>
+          <input type="number" id="usuarios-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('usuarios')">
+          <button class="btn btn-hash" onclick="buscarPorHash('usuarios')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadTable('usuarios')" title="Limpar busca">✕</button>
         </div>
         <div class="order-toggle">
           <button class="order-btn active" onclick="setOrder('usuarios','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
@@ -658,20 +670,6 @@
 
 <script src="app.js"></script>
 <script>
-  function filterCurrentTable(val) {
-    const tbodyMap = {
-      livros:         'livros-tbody',
-      autores:        'autores-tbody',
-      editoras:       'editoras-tbody',
-      livros_autores: 'livros-autores-tbody',
-      tags:           'tags-tbody',
-      tags_livros:    'tags-livros-tbody',
-      usuarios:       'usuarios-tbody'
-    };
-    const id = tbodyMap[currentPage];
-    if (id) filterTable(id, val);
-  }
-
   function reloadCurrent() {
     if (currentPage === 'dashboard') loadDashboard();
     else loadTable(currentPage);

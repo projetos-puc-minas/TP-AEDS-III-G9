@@ -828,3 +828,56 @@ body {
   max-height: 90vh;
   overflow-y: auto;
 }
+/* ══════════ HASH SEARCH ══════════ */
+.hash-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px 4px 8px;
+}
+
+.hash-icon {
+  font-size: 15px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.hash-search input[type="number"] {
+  width: 110px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.hash-search input[type="number"]::-webkit-outer-spin-button,
+.hash-search input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.btn-hash {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  letter-spacing: 0.03em;
+}
+.btn-hash:hover { opacity: 0.85; }
+
+/* Linha destacada após busca por hash */
+@keyframes hashHighlight {
+  0%   { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+  100% { background: transparent; }
+}
+.hash-result-row {
+  animation: hashHighlight 2.5s ease-out forwards;
+}

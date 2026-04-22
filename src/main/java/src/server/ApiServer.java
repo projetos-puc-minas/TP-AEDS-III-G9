@@ -75,7 +75,6 @@ public class ApiServer {
     }
 
     // --- HANDLER: LIVROS ---
-    // Retorna nomeEditora, lista de autores (nomes) e lista de tags (nomes)
     private class LivrosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -143,14 +142,12 @@ public class ApiServer {
         }
 
         private JSONObject livroToJson(Livro l) {
-            // Nome da editora
             String nomeEditora = "Editora #" + l.getIdEditora();
             try {
                 Editora ed = factory.getEditoraDAO().buscarEditora(l.getIdEditora());
                 if (ed != null) nomeEditora = ed.getNome();
             } catch (Exception ignored) {}
 
-            // Nomes dos autores vinculados
             JSONArray autoresArr = new JSONArray();
             try {
                 List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarAutoresDoLivro(l.getId());
@@ -162,7 +159,6 @@ public class ApiServer {
                 }
             } catch (Exception ignored) {}
 
-            // Nomes das tags vinculadas
             JSONArray tagsArr = new JSONArray();
             try {
                 List<TagsLivros> vinculos = factory.getTagsLivrosDAO().buscarTagsDoLivro(l.getId());
@@ -189,7 +185,7 @@ public class ApiServer {
     }
 
     // --- HANDLER: AUTORES ---
-    // Retorna lista de livros (títulos) vinculados ao autor
+    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarAutor(id)
     private class AutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -200,14 +196,21 @@ public class ApiServer {
                 String method = ex.getRequestMethod();
 
                 if ("GET".equals(method)) {
-                    JSONArray arr = new JSONArray();
-                    for (Autores a : dao.listarOrdenadoPorId()) arr.put(autorToJson(a));
-                    sendJson(ex, 200, arr.toString());
+                    if (id > 0) {
+                        // Busca direta via Hash Extensível — O(1) amortizado
+                        Autores a = dao.buscarAutor(id);
+                        if (a == null) { send404(ex); return; }
+                        sendJson(ex, 200, autorToJson(a).toString());
+                    } else {
+                        JSONArray arr = new JSONArray();
+                        for (Autores a : dao.listarOrdenadoPorId()) arr.put(autorToJson(a));
+                        sendJson(ex, 200, arr.toString());
+                    }
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     long ts = DataUtil.stringToTimestamp(j.getString("dataNascimento"));
-                    dao.adicionarAutor(new Autores(j.getString("nome"), ts, j.optString("biografia")));
-                    sendJson(ex, 201, "{\"ok\":true}");
+                    int novoId = dao.adicionarAutor(new Autores(j.getString("nome"), ts, j.optString("biografia")));
+                    sendJson(ex, 201, "{\"ok\":true,\"id\":" + novoId + "}");
                 } else if ("PUT".equals(method)) {
                     if (id <= 0) { send404(ex); return; }
                     Autores existente = dao.buscarAutor(id);
@@ -231,7 +234,6 @@ public class ApiServer {
         }
 
         private JSONObject autorToJson(Autores a) {
-            // Livros vinculados ao autor
             JSONArray livrosArr = new JSONArray();
             try {
                 List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarLivrosDoAutor(a.getId());
@@ -244,16 +246,17 @@ public class ApiServer {
             } catch (Exception ignored) {}
 
             return new JSONObject()
-                .put("id",                     a.getId())
-                .put("nome",                   a.getNome())
-                .put("dataNascimento",         a.getDataNascimento())
+                .put("id",                      a.getId())
+                .put("nome",                    a.getNome())
+                .put("dataNascimento",          a.getDataNascimento())
                 .put("dataNascimentoFormatada", a.getDataNascimentoFormatada())
-                .put("biografia",              a.getBiografia() != null ? a.getBiografia() : "")
-                .put("livros",                 livrosArr);
+                .put("biografia",               a.getBiografia() != null ? a.getBiografia() : "")
+                .put("livros",                  livrosArr);
         }
     }
 
     // --- HANDLER: EDITORAS ---
+    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarEditora(id)
     private class EditorasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -264,15 +267,26 @@ public class ApiServer {
                 String method = ex.getRequestMethod();
 
                 if ("GET".equals(method)) {
-                    JSONArray arr = new JSONArray();
-                    for (Editora e : dao.listarOrdenadoPorId()) {
-                        arr.put(new JSONObject()
+                    if (id > 0) {
+                        // Busca direta via Hash Extensível — O(1) amortizado
+                        Editora e = dao.buscarEditora(id);
+                        if (e == null) { send404(ex); return; }
+                        sendJson(ex, 200, new JSONObject()
                             .put("id",          e.getId())
                             .put("nome",        e.getNome())
                             .put("cidade",      e.getCidade())
-                            .put("anoFundacao", e.getAnoFundacao()));
+                            .put("anoFundacao", e.getAnoFundacao()).toString());
+                    } else {
+                        JSONArray arr = new JSONArray();
+                        for (Editora e : dao.listarOrdenadoPorId()) {
+                            arr.put(new JSONObject()
+                                .put("id",          e.getId())
+                                .put("nome",        e.getNome())
+                                .put("cidade",      e.getCidade())
+                                .put("anoFundacao", e.getAnoFundacao()));
+                        }
+                        sendJson(ex, 200, arr.toString());
                     }
-                    sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     dao.incluirEditora(new Editora(j.getString("nome"), j.optString("cidade"), j.optInt("anoFundacao")));
@@ -301,7 +315,7 @@ public class ApiServer {
     }
 
     // --- HANDLER: USUARIOS ---
-    // Agora inclui campo multivalorado redesSociais (String[])
+    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarUsuario(id)
     private class UsuariosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -313,18 +327,22 @@ public class ApiServer {
                 String method = ex.getRequestMethod();
 
                 if ("GET".equals(method)) {
-                    JSONArray arr = new JSONArray();
-                    for (Usuarios u : dao.listarOrdenadoPorId()) {
-                        arr.put(usuarioToJson(u));
+                    if (id > 0) {
+                        // Busca direta via Hash Extensível — O(1) amortizado
+                        Usuarios u = dao.buscarUsuario(id);
+                        if (u == null) { send404(ex); return; }
+                        sendJson(ex, 200, usuarioToJson(u).toString());
+                    } else {
+                        JSONArray arr = new JSONArray();
+                        for (Usuarios u : dao.listarOrdenadoPorId()) arr.put(usuarioToJson(u));
+                        sendJson(ex, 200, arr.toString());
                     }
-                    sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     int novoId = service.cadastrar(j.getString("nome"), j.getString("email"), j.getString("senha"));
                     if (novoId == -1) {
                         sendJson(ex, 409, "{\"erro\":\"Email já cadastrado.\"}");
                     } else {
-                        // Se vieram redesSociais, salva após criação
                         if (j.has("redesSociais")) {
                             Usuarios u = dao.buscarUsuario(novoId);
                             if (u != null) {
@@ -375,7 +393,6 @@ public class ApiServer {
     }
 
     // --- HANDLER: N:N LIVROS-AUTORES ---
-    // Agora retorna nomeLivro e nomeAutor
     private class LivrosAutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -386,8 +403,10 @@ public class ApiServer {
                 String method = ex.getRequestMethod();
 
                 if ("GET".equals(method)) {
-                    JSONArray arr = new JSONArray();
-                    for (LivroAutor la : dao.listarTodos()) {
+                    if (id > 0) {
+                        // Busca direta via Hash Extensível — O(1) amortizado
+                        LivroAutor la = dao.buscarPorId(id);
+                        if (la == null) { send404(ex); return; }
                         String nomeLivro = "Livro #" + la.getIdLivro();
                         String nomeAutor = "Autor #" + la.getIdAutor();
                         try {
@@ -398,15 +417,34 @@ public class ApiServer {
                             Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
                             if (a != null) nomeAutor = a.getNome();
                         } catch (Exception ignored) {}
-
-                        arr.put(new JSONObject()
+                        sendJson(ex, 200, new JSONObject()
                             .put("id",        la.getId())
                             .put("idLivro",   la.getIdLivro())
                             .put("idAutor",   la.getIdAutor())
                             .put("nomeLivro", nomeLivro)
-                            .put("nomeAutor", nomeAutor));
+                            .put("nomeAutor", nomeAutor).toString());
+                    } else {
+                        JSONArray arr = new JSONArray();
+                        for (LivroAutor la : dao.listarTodos()) {
+                            String nomeLivro = "Livro #" + la.getIdLivro();
+                            String nomeAutor = "Autor #" + la.getIdAutor();
+                            try {
+                                Livro l = factory.getLivroDAO().buscarLivroPorId(la.getIdLivro());
+                                if (l != null) nomeLivro = l.getTitulo();
+                            } catch (Exception ignored) {}
+                            try {
+                                Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
+                                if (a != null) nomeAutor = a.getNome();
+                            } catch (Exception ignored) {}
+                            arr.put(new JSONObject()
+                                .put("id",        la.getId())
+                                .put("idLivro",   la.getIdLivro())
+                                .put("idAutor",   la.getIdAutor())
+                                .put("nomeLivro", nomeLivro)
+                                .put("nomeAutor", nomeAutor));
+                        }
+                        sendJson(ex, 200, arr.toString());
                     }
-                    sendJson(ex, 200, arr.toString());
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     dao.vincularAutorAoLivro(j.getInt("idLivro"), j.getInt("idAutor"));
@@ -423,7 +461,6 @@ public class ApiServer {
     }
 
     // --- HANDLER: N:N TAGS-LIVROS ---
-    // Agora retorna nomeTag e nomeLivro
     private class TagsLivrosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -435,19 +472,10 @@ public class ApiServer {
                 String query  = ex.getRequestURI().getQuery();
 
                 if ("GET".equals(method)) {
-                    List<TagsLivros> lista;
-                    if (query != null && query.startsWith("idTag=")) {
-                        int idTag = Integer.parseInt(query.substring(6));
-                        lista = dao.buscarLivrosDaTag(idTag);
-                    } else if (query != null && query.startsWith("idLivro=")) {
-                        int idLivro = Integer.parseInt(query.substring(8));
-                        lista = dao.buscarTagsDoLivro(idLivro);
-                    } else {
-                        lista = dao.listarTodos();
-                    }
-
-                    JSONArray arr = new JSONArray();
-                    for (TagsLivros tl : lista) {
+                    if (id > 0) {
+                        // Busca direta via Hash Extensível — O(1) amortizado
+                        TagsLivros tl = dao.buscarPorId(id);
+                        if (tl == null) { send404(ex); return; }
                         String nomeTag   = "Tag #"   + tl.getIdTag();
                         String nomeLivro = "Livro #" + tl.getIdLivro();
                         try {
@@ -458,16 +486,44 @@ public class ApiServer {
                             Livro l = factory.getLivroDAO().buscarLivroPorId(tl.getIdLivro());
                             if (l != null) nomeLivro = l.getTitulo();
                         } catch (Exception ignored) {}
-
-                        arr.put(new JSONObject()
+                        sendJson(ex, 200, new JSONObject()
                             .put("id",        tl.getId())
                             .put("idTag",     tl.getIdTag())
                             .put("idLivro",   tl.getIdLivro())
                             .put("nomeTag",   nomeTag)
-                            .put("nomeLivro", nomeLivro));
+                            .put("nomeLivro", nomeLivro).toString());
+                    } else {
+                        List<TagsLivros> lista;
+                        if (query != null && query.startsWith("idTag=")) {
+                            int idTag = Integer.parseInt(query.substring(6));
+                            lista = dao.buscarLivrosDaTag(idTag);
+                        } else if (query != null && query.startsWith("idLivro=")) {
+                            int idLivro = Integer.parseInt(query.substring(8));
+                            lista = dao.buscarTagsDoLivro(idLivro);
+                        } else {
+                            lista = dao.listarTodos();
+                        }
+                        JSONArray arr = new JSONArray();
+                        for (TagsLivros tl : lista) {
+                            String nomeTag   = "Tag #"   + tl.getIdTag();
+                            String nomeLivro = "Livro #" + tl.getIdLivro();
+                            try {
+                                Tag t = factory.getTagDAO().buscarTag(tl.getIdTag());
+                                if (t != null) nomeTag = t.getNome();
+                            } catch (Exception ignored) {}
+                            try {
+                                Livro l = factory.getLivroDAO().buscarLivroPorId(tl.getIdLivro());
+                                if (l != null) nomeLivro = l.getTitulo();
+                            } catch (Exception ignored) {}
+                            arr.put(new JSONObject()
+                                .put("id",        tl.getId())
+                                .put("idTag",     tl.getIdTag())
+                                .put("idLivro",   tl.getIdLivro())
+                                .put("nomeTag",   nomeTag)
+                                .put("nomeLivro", nomeLivro));
+                        }
+                        sendJson(ex, 200, arr.toString());
                     }
-                    sendJson(ex, 200, arr.toString());
-
                 } else if ("POST".equals(method)) {
                     JSONObject j = readBody(ex);
                     int idTag   = j.getInt("idTag");
@@ -478,12 +534,10 @@ public class ApiServer {
                     }
                     boolean ok = dao.vincularTagAoLivro(idTag, idLivro);
                     sendJson(ex, ok ? 201 : 500, "{\"ok\":" + ok + "}");
-
                 } else if ("DELETE".equals(method)) {
                     if (id <= 0) { send404(ex); return; }
                     boolean ok = dao.excluirPorId(id);
                     sendJson(ex, ok ? 200 : 404, "{\"ok\":" + ok + "}");
-
                 } else {
                     sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
                 }
@@ -573,7 +627,7 @@ public class ApiServer {
         }
     }
 
-    // AUXILIARES
+    // --- AUXILIARES ---
 
     private static int extractId(HttpExchange ex) {
         String[] parts = ex.getRequestURI().getPath().split("/");
