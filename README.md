@@ -46,7 +46,7 @@ O **BiblioSys** é um sistema de gestão de acervo bibliográfico desenvolvido p
 
 ---
 
-## 🔧 Como Executar
+##  Como Executar
 
 ### Pré-requisitos
 *   Java JDK 17 ou superior.
@@ -68,7 +68,7 @@ O **BiblioSys** é um sistema de gestão de acervo bibliográfico desenvolvido p
 
 ##  Decisões de Projeto
 
-| Perguntas | Respostas |
+| Pergunta | Resposta Técnica |
 | :--- | :--- |
 | **Estrutura dos registros?** | Variável, com campos de tamanho fixo (int, long) e strings precedidas pelo seu tamanho. |
 | **Exclusão lógica?** | Implementada via *lápide* (booleano no início do registro). O espaço é devolvido para uma lista de excluídos no cabeçalho. |
@@ -78,7 +78,7 @@ O **BiblioSys** é um sistema de gestão de acervo bibliográfico desenvolvido p
 
 ---
 
-## Membros do Grupo (G9)
+##  Membros do Grupo (G9)
 
 *   Fernando Mucci
 *   Maria Eduarda P. Brito
