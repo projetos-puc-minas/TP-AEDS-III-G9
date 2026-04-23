@@ -11,24 +11,25 @@ import src.util.Arquivo;
 import src.util.Arquivo.CreateResult;
 import src.util.ArvoreBMais;
 import src.util.HashExtensivel;
+import src.util.HashExtensivelLong;
 import src.util.OrdenacaoExterna;
 
 
 public class LivroDAO {
 
-    private final Arquivo<Livro> arqLivros;
-    private final ArvoreBMais    indiceId;        
-    private final HashExtensivel hashId;           
-    private final ArvoreBMais    indicePorEditora; 
+    private final Arquivo<Livro>     arqLivros;
+    private final ArvoreBMais        indiceId;        // B+ para listagem ordenada por PK
+    private final HashExtensivel     hashId;           // Hash extensível para busca O(1) por PK
+    private final HashExtensivelLong hashPorEditora;   // Hash extensível 1:N: chave composta (idEditora, idLivro)
 
     private LivroAutorDAO livroAutorDAO;
-    private TagsLivrosDAO tagsLivrosDAO; 
+    private TagsLivrosDAO tagsLivrosDAO;
 
     public LivroDAO() throws Exception {
-        arqLivros        = new Arquivo<>("livros", Livro.class.getConstructor());
-        indiceId         = new ArvoreBMais("livros_id");
-        hashId           = new HashExtensivel("livros_id");
-        indicePorEditora = new ArvoreBMais("livros_por_editora");
+        arqLivros      = new Arquivo<>("livros", Livro.class.getConstructor());
+        indiceId       = new ArvoreBMais("livros_id");
+        hashId         = new HashExtensivel("livros_id");
+        hashPorEditora = new HashExtensivelLong("livros_por_editora");
     }
 
     public void setLivroAutorDAO(LivroAutorDAO dao) {
@@ -42,12 +43,17 @@ public class LivroDAO {
     // CREATE
 
     public int incluirLivro(Livro livro) throws Exception {
+        // Validação de ISBN único
+        if (buscarLivroPorIsbn(new String(livro.getIsbn()).trim()) != null) {
+            throw new Exception("Já existe um livro cadastrado com este ISBN.");
+        }
+
         CreateResult cr = arqLivros.create(livro);
         if (cr.id > 0) {
             indiceId.inserir(cr.id, cr.endereco);
             hashId.inserir(cr.id, cr.endereco);
-            // Índice 1:N: chave composta (idEditora << 16 | idLivro) agrupa livros por editora
-            indicePorEditora.inserir(chaveEditora(livro.getIdEditora(), cr.id), cr.endereco);
+            // Índice 1:N com Hash Extensível: chave composta (idEditora, idLivro) → offset do livro
+            hashPorEditora.inserir(chaveEditora(livro.getIdEditora(), cr.id), cr.endereco);
         }
         return cr.id;
     }
@@ -88,15 +94,16 @@ public class LivroDAO {
 
     public List<Livro> buscarLivrosPorEditora(int idEditora) throws Exception {
         List<Livro> resultado = new ArrayList<>();
-        long chaveMin = (long) idEditora << 16;
-        long chaveMax = (long) (idEditora + 1) << 16;
+        // Chave mínima: idEditora nos 32 bits superiores, 0 nos 32 bits inferiores
+        long chaveMin = ((long) idEditora) << 32;
+        // Chave máxima: (idEditora + 1) nos 32 bits superiores, 0 nos 32 bits inferiores
+        long chaveMax = ((long) (idEditora + 1)) << 32;
 
-        long[][] pares = indicePorEditora.listarOrdenado();
+        // Navegação 1:N via Hash Extensível: recupera todos os filhos do pai (idEditora)
+        long[][] pares = hashPorEditora.listarPorFaixa(chaveMin, chaveMax);
         for (long[] par : pares) {
-            if (par[0] >= chaveMin && par[0] < chaveMax) {
-                Livro l = arqLivros.readByOffset(par[1]);
-                if (l != null) resultado.add(l);
-            }
+            Livro l = arqLivros.readByOffset(par[1]);
+            if (l != null) resultado.add(l);
         }
         return resultado;
     }
@@ -104,19 +111,24 @@ public class LivroDAO {
     // UPDATE
 
     public boolean alterarLivro(Livro livro) throws Exception {
+        // Validação de ISBN único (excluindo o próprio livro)
+        Livro existente = buscarLivroPorIsbn(new String(livro.getIsbn()).trim());
+        if (existente != null && existente.getId() != livro.getId()) {
+            throw new Exception("Já existe outro livro cadastrado com este ISBN.");
+        }
+
         // Guarda o idEditora ANTES do update para poder remover a chave composta antiga
         Livro antigo = buscarLivroPorId(livro.getId());
         boolean ok = arqLivros.update(livro);
         if (ok) {
             if (antigo != null && antigo.getIdEditora() != livro.getIdEditora()) {
-                // Editora mudou — remove índice antigo e insere o novo após reindexar
-                indicePorEditora.remover(chaveEditora(antigo.getIdEditora(), livro.getId()));
+                // Editora mudou — remove chave composta antiga e insere nova
+                hashPorEditora.remover(chaveEditora(antigo.getIdEditora(), livro.getId()));
                 reindexar(livro.getId());
                 long offsetAtual = hashId.buscar(livro.getId());
                 if (offsetAtual != ArvoreBMais.NULO)
-                    indicePorEditora.inserir(chaveEditora(livro.getIdEditora(), livro.getId()), offsetAtual);
+                    hashPorEditora.inserir(chaveEditora(livro.getIdEditora(), livro.getId()), offsetAtual);
             } else {
-                // Editora não mudou: reindexar atualiza todos os índices normalmente
                 reindexar(livro.getId());
             }
         }
@@ -140,7 +152,7 @@ public class LivroDAO {
             indiceId.remover(id);
             hashId.remover(id);
             if (livro != null)
-                indicePorEditora.remover(chaveEditora(livro.getIdEditora(), id));
+                hashPorEditora.remover(chaveEditora(livro.getIdEditora(), id));
         }
         return ok;
     }
@@ -163,7 +175,7 @@ public class LivroDAO {
             indiceId.remover(id);
             hashId.remover(id);
             if (livro != null)
-                indicePorEditora.remover(chaveEditora(livro.getIdEditora(), id));
+                hashPorEditora.remover(chaveEditora(livro.getIdEditora(), id));
         }
         return ok;
     }
@@ -224,8 +236,8 @@ public class LivroDAO {
 
     // Auxiliares
 
-    private static int chaveEditora(int idEditora, int idLivro) {
-        return (idEditora << 16) | (idLivro & 0xFFFF);
+    private static long chaveEditora(int idEditora, int idLivro) {
+        return (((long) idEditora) << 32) | (idLivro & 0xFFFFFFFFL);
     }
 
     private void verificarDependentesAutores(int id) throws Exception {
@@ -257,7 +269,7 @@ public class LivroDAO {
                     if (idLido == id) {
                         indiceId.atualizar(id, pos);
                         hashId.atualizar(id, pos);
-                        indicePorEditora.atualizar(chaveEditora(idEditoraLido, id), pos);
+                        hashPorEditora.atualizar(chaveEditora(idEditoraLido, id), pos);
                         return;
                     }
                 } else {

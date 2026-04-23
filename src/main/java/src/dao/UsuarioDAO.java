@@ -29,6 +29,11 @@ public class UsuarioDAO {
     // CREATE
 
     public int incluirUsuario(Usuarios usuario) throws Exception {
+        // Validação de e-mail único
+        if (buscarPorEmail(usuario.getEmail()) != null) {
+            throw new Exception("Já existe um usuário cadastrado com este e-mail.");
+        }
+
         CreateResult cr = arqUsuarios.create(usuario);
         if (cr.id > 0) {
             indice.inserir(cr.id, cr.endereco);
@@ -63,6 +68,12 @@ public class UsuarioDAO {
     // UPDATE
 
     public boolean alterarUsuario(Usuarios usuario) throws Exception {
+        // Validação de e-mail único (excluindo o próprio usuário)
+        Usuarios existente = buscarPorEmail(usuario.getEmail());
+        if (existente != null && existente.getId() != usuario.getId()) {
+            throw new Exception("Já existe outro usuário cadastrado com este e-mail.");
+        }
+
         boolean ok = arqUsuarios.update(usuario);
         if (ok) {
             // Se o update precisou de mover o registo de sítio (não coube no bloco),
