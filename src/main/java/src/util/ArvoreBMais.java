@@ -30,6 +30,7 @@ public class ArvoreBMais implements Indexador {
 
         if (idx.length() < TAM_CABECALHO) {
             idx.seek(0);
+            
             idx.writeLong(NULO);
             idx.writeLong(0L);
             idx.writeLong(0L);
@@ -43,11 +44,14 @@ public class ArvoreBMais implements Indexador {
 
         if (raiz == NULO) {
             No folha = new No(true);
+            
             folha.chaves[0] = chave;
             folha.ptrs[0] = endereco;
             folha.qtdChaves = 1;
+            
             setRaiz(alocarNo(folha));
             incrementaTotal(1);
+            
             return;
         }
 
@@ -55,10 +59,12 @@ public class ArvoreBMais implements Indexador {
 
         if (promovido != null) {
             No novaRaiz = new No(false);
+            
             novaRaiz.chaves[0] = promovido.chavePromovida;
             novaRaiz.ptrs[0] = raiz;
             novaRaiz.ptrs[1] = promovido.novoFilho;
             novaRaiz.qtdChaves = 1;
+            
             setRaiz(alocarNo(novaRaiz));
         }
 
@@ -69,14 +75,17 @@ public class ArvoreBMais implements Indexador {
     public long buscar(int chave) throws Exception {
         long raiz = getRaiz();
         if (raiz == NULO) return NULO;
+        
         return buscarNaFolha(raiz, chave);
     }
 
     public boolean remover(int chave) throws Exception {
         long raiz = getRaiz();
         if (raiz == NULO) return false;
+        
         boolean ok = removerRecursivo(raiz, chave, NULO, -1);
         if (ok) incrementaTotal(-1);
+        
         return ok;
     }
 
@@ -84,6 +93,7 @@ public class ArvoreBMais implements Indexador {
     public boolean atualizar(int chave, long novoEndereco) throws Exception {
         long raiz = getRaiz();
         if (raiz == NULO) return false;
+        
         return atualizarNaFolha(raiz, chave, novoEndereco);
     }
 
@@ -93,19 +103,23 @@ public class ArvoreBMais implements Indexador {
 
         long ptr = raiz;
         No no = lerNo(ptr);
+        
         while (!no.folha) {
             ptr = no.ptrs[0];
             no = lerNo(ptr);
         }
 
         List<long[]> lista = new ArrayList<>();
+        
         while (ptr != NULO) {
             no = lerNo(ptr);
+            
             for (int i = 0; i < no.qtdChaves; i++) {
                 if (no.ptrs[i] != NULO) {
                     lista.add(new long[]{no.chaves[i], no.ptrs[i]});
                 }
             }
+            
             ptr = no.ptrProximo;
         }
 
@@ -116,8 +130,10 @@ public class ArvoreBMais implements Indexador {
         long[][] crescente = listarOrdenado();
 
         int esq = 0, dir = crescente.length - 1;
+        
         while (esq < dir) {
             long[] tmp = crescente[esq];
+            
             crescente[esq] = crescente[dir];
             crescente[dir] = tmp;
             esq++;
@@ -129,6 +145,7 @@ public class ArvoreBMais implements Indexador {
 
     public long getTotalChaves() throws Exception {
         idx.seek(OFFSET_TOTAL);
+        
         return idx.readLong();
     }
 
@@ -152,22 +169,27 @@ public class ArvoreBMais implements Indexador {
 
     private long filhoParaBusca(No no, int chave) {
         int lo = 0, hi = no.qtdChaves - 1;
+        
         while (lo <= hi) {
             int mid = (lo + hi) >>> 1;
+            
             if (chave < no.chaves[mid]) hi = mid - 1;
             else if (chave > no.chaves[mid]) lo = mid + 1;
             else return no.ptrs[mid + 1];
         }
+        
         return no.ptrs[lo];
     }
 
     private int buscaBinaria(int[] arr, int l, int r, int chave) {
         while (l <= r) {
             int m = (l + r) >>> 1;
+            
             if (chave < arr[m]) r = m - 1;
             else if (chave > arr[m]) l = m + 1;
             else return m;
         }
+        
         return -1;
     }
 
@@ -180,28 +202,35 @@ public class ArvoreBMais implements Indexador {
         ResultadoInsercao promovido = inserirRecursivo(posFilho, chave, endereco);
 
         if (promovido == null) return null;
+        
         return inserirEmInterno(posNo, no, promovido.chavePromovida, promovido.novoFilho);
     }
 
     private ResultadoInsercao inserirNaFolha(long posNo, No no, int chave, long endereco) throws Exception {
         int pos = buscaBinaria(no.chaves, 0, no.qtdChaves - 1, chave);
+        
         if (pos >= 0) {
             no.ptrs[pos] = endereco;
             gravarNo(posNo, no);
+            
             return null;
         }
 
         if (no.qtdChaves < ORDEM) {
             int i = no.qtdChaves - 1;
+            
             while (i >= 0 && chave < no.chaves[i]) {
                 no.chaves[i + 1] = no.chaves[i];
                 no.ptrs[i + 1] = no.ptrs[i];
                 i--;
             }
+            
             no.chaves[i + 1] = chave;
             no.ptrs[i + 1] = endereco;
             no.qtdChaves++;
+            
             gravarNo(posNo, no);
+            
             return null;
         }
 
@@ -210,6 +239,7 @@ public class ArvoreBMais implements Indexador {
 
         boolean inserido = false;
         int src = 0;
+        
         for (int dst = 0; dst <= ORDEM; dst++) {
             if (!inserido && (src >= ORDEM || chave <= no.chaves[src])) {
                 tmpChaves[dst] = chave;
@@ -225,6 +255,7 @@ public class ArvoreBMais implements Indexador {
         int meio = ORDEM / 2;
 
         no.qtdChaves = meio;
+        
         for (int k = 0; k < meio; k++) {
             no.chaves[k] = tmpChaves[k];
             no.ptrs[k] = tmpPtrs[k];
@@ -232,6 +263,7 @@ public class ArvoreBMais implements Indexador {
 
         No direita = new No(true);
         direita.qtdChaves = (ORDEM + 1) - meio;
+        
         for (int k = 0; k < direita.qtdChaves; k++) {
             direita.chaves[k] = tmpChaves[meio + k];
             direita.ptrs[k] = tmpPtrs[meio + k];
@@ -240,26 +272,33 @@ public class ArvoreBMais implements Indexador {
         direita.ptrProximo = no.ptrProximo;
         long posDireita = alocarNo(direita);
         no.ptrProximo = posDireita;
+        
         gravarNo(posNo, no);
 
         ResultadoInsercao res = new ResultadoInsercao();
+        
         res.chavePromovida = direita.chaves[0];
         res.novoFilho = posDireita;
+        
         return res;
     }
 
     private ResultadoInsercao inserirEmInterno(long posNo, No no, int chave, long filhoDir) throws Exception {
         if (no.qtdChaves < ORDEM) {
             int i = no.qtdChaves - 1;
+            
             while (i >= 0 && chave < no.chaves[i]) {
                 no.chaves[i + 1] = no.chaves[i];
                 no.ptrs[i + 2] = no.ptrs[i + 1];
                 i--;
             }
+            
             no.chaves[i + 1] = chave;
             no.ptrs[i + 2] = filhoDir;
             no.qtdChaves++;
+            
             gravarNo(posNo, no);
+            
             return null;
         }
 
@@ -270,11 +309,13 @@ public class ArvoreBMais implements Indexador {
         for (int k = 0; k <= ORDEM; k++) tmpPtrs[k] = no.ptrs[k];
 
         int i = ORDEM - 1;
+        
         while (i >= 0 && chave < tmpChaves[i]) {
             tmpChaves[i + 1] = tmpChaves[i];
             tmpPtrs[i + 2] = tmpPtrs[i + 1];
             i--;
         }
+        
         tmpChaves[i + 1] = chave;
         tmpPtrs[i + 2] = filhoDir;
 
@@ -282,22 +323,27 @@ public class ArvoreBMais implements Indexador {
         int chavePromovida = tmpChaves[meio];
 
         no.qtdChaves = meio;
+        
         for (int k = 0; k < meio; k++) no.chaves[k] = tmpChaves[k];
         for (int k = 0; k <= meio; k++) no.ptrs[k] = tmpPtrs[k];
+        
         gravarNo(posNo, no);
 
         No direita = new No(false);
         direita.qtdChaves = ORDEM - meio;
+        
         for (int k = 0; k < direita.qtdChaves; k++) {
             direita.chaves[k] = tmpChaves[meio + 1 + k];
             direita.ptrs[k] = tmpPtrs[meio + 1 + k];
         }
+        
         direita.ptrs[direita.qtdChaves] = tmpPtrs[ORDEM + 1];
         long posDireita = alocarNo(direita);
 
         ResultadoInsercao res = new ResultadoInsercao();
         res.chavePromovida = chavePromovida;
         res.novoFilho = posDireita;
+        
         return res;
     }
 
@@ -312,6 +358,7 @@ public class ArvoreBMais implements Indexador {
                 no.chaves[j] = no.chaves[j + 1];
                 no.ptrs[j] = no.ptrs[j + 1];
             }
+            
             no.qtdChaves--;
             gravarNo(posNo, no);
 
@@ -319,6 +366,7 @@ public class ArvoreBMais implements Indexador {
                 if (posNoPai != NULO && pos == 0 && no.qtdChaves > 0) {
                     atualizarSeparadorNoPai(posNoPai, idxNoPai, no.chaves[0]);
                 }
+                
                 return true;
             }
 
@@ -328,6 +376,7 @@ public class ArvoreBMais implements Indexador {
 
         int i = no.qtdChaves - 1;
         while (i >= 0 && chave < no.chaves[i]) i--;
+        
         int idxFilho = i + 1;
         long posFilho = no.ptrs[idxFilho];
 
@@ -342,9 +391,11 @@ public class ArvoreBMais implements Indexador {
 
         if (posIrmaoEsq != NULO) {
             No irmaoEsq = lerNo(posIrmaoEsq);
+            
             if (irmaoEsq.qtdChaves > minKeys) {
                 int chavePegada = irmaoEsq.chaves[irmaoEsq.qtdChaves - 1];
                 long ptrPegado = irmaoEsq.ptrs[irmaoEsq.qtdChaves - 1];
+                
                 irmaoEsq.qtdChaves--;
                 gravarNo(posIrmaoEsq, irmaoEsq);
 
@@ -352,32 +403,39 @@ public class ArvoreBMais implements Indexador {
                     no.chaves[k] = no.chaves[k - 1];
                     no.ptrs[k] = no.ptrs[k - 1];
                 }
+                
                 no.chaves[0] = chavePegada;
                 no.ptrs[0] = ptrPegado;
                 no.qtdChaves++;
+                
                 gravarNo(posNo, no);
 
                 atualizarSeparadorNoPai(posNoPai, idxNoPai, no.chaves[0]);
+                
                 return;
             }
         }
 
         if (posIrmaoDir != NULO) {
             No irmaoDir = lerNo(posIrmaoDir);
+            
             if (irmaoDir.qtdChaves > minKeys) {
                 no.chaves[no.qtdChaves] = irmaoDir.chaves[0];
                 no.ptrs[no.qtdChaves] = irmaoDir.ptrs[0];
                 no.qtdChaves++;
+                
                 gravarNo(posNo, no);
 
                 for (int k = 0; k < irmaoDir.qtdChaves - 1; k++) {
                     irmaoDir.chaves[k] = irmaoDir.chaves[k + 1];
                     irmaoDir.ptrs[k] = irmaoDir.ptrs[k + 1];
                 }
+                
                 irmaoDir.qtdChaves--;
                 gravarNo(posIrmaoDir, irmaoDir);
 
                 atualizarSeparadorNoPai(posNoPai, idxNoPai + 1, irmaoDir.chaves[0]);
+                
                 return;
             }
         }
@@ -398,17 +456,21 @@ public class ArvoreBMais implements Indexador {
             esq.chaves[esq.qtdChaves + k] = dir.chaves[k];
             esq.ptrs[esq.qtdChaves + k] = dir.ptrs[k];
         }
+        
         esq.qtdChaves += dir.qtdChaves;
         esq.ptrProximo = dir.ptrProximo;
+        
         gravarNo(posEsq, esq);
 
         for (int k = separadorIdx; k < pai.qtdChaves - 1; k++) {
             pai.chaves[k] = pai.chaves[k + 1];
             pai.ptrs[k + 1] = pai.ptrs[k + 2];
         }
+        
         pai.qtdChaves--;
 
         long posRaiz = getRaiz();
+        
         if (posNoPai == posRaiz && pai.qtdChaves == 0) {
             setRaiz(posEsq);
         } else {
@@ -422,6 +484,7 @@ public class ArvoreBMais implements Indexador {
     private void tratarUnderflowInterno(long posNo, No no) throws Exception {
         long posRaiz = getRaiz();
         long posNoPai = encontrarPai(posRaiz, posNo);
+        
         if (posNoPai == NULO) return;
 
         No pai = lerNo(posNoPai);
@@ -515,6 +578,7 @@ public class ArvoreBMais implements Indexador {
             pai.chaves[k] = pai.chaves[k + 1];
             pai.ptrs[k + 1] = pai.ptrs[k + 2];
         }
+        
         pai.qtdChaves--;
 
         long posRaiz = getRaiz();
@@ -570,6 +634,7 @@ public class ArvoreBMais implements Indexador {
 
     private No lerNo(long posicao) throws Exception {
         idx.seek(posicao);
+        
         No no = new No(idx.readBoolean());
         no.qtdChaves = idx.readInt();
         
