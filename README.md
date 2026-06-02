@@ -63,6 +63,10 @@ O **BiblioSys** é um sistema de gestão de acervo bibliográfico desenvolvido p
     ```
 3.  **Aceder à interface**:
     Abra o seu navegador e aceda a `http://localhost:8080`.
+4. **Compremer o projeto**:
+    ```bash
+   java -cp "./target/classes;lib/json.jar" Main --backup
+   ```
 
 ---
 
