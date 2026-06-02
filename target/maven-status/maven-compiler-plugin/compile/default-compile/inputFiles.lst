@@ -1,4 +1,10 @@
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\Main.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\BitInputStream.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\BitOutputStream.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\CompressionMetrics.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\HuffmanCompressor.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\HuffmanNode.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\compression\LZWCompressor.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\dao\AutoresDAO.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\dao\DAOFactory.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\dao\EditoraDAO.java
@@ -20,7 +26,9 @@ C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\Arquivo.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\ArvoreBMais.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\DataUtil.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\HashExtensivel.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\HashExtensivelLong.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\Indexador.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\OrdenacaoExterna.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\PacoteBackup.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\Registro.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\SerializadorUtil.java
