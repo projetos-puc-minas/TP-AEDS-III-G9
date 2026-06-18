@@ -917,3 +917,37 @@ body {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
+/* ─── BUSCA TEXTUAL ─── */
+.text-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+}
+
+.text-search input[type="text"] {
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    width: 160px;
+    padding: 4px 6px;
+}
+
+.text-search select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 4px 6px;
+    font-size: 12px;
+    outline: none;
+}
+
+.text-search select:focus {
+    border-color: var(--accent);
+}

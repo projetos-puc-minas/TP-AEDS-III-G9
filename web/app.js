@@ -857,6 +857,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+  // ─── BUSCA TEXTUAL (KMP / BM) ───
+async function buscarTexto() {
+    const padraoInput = document.getElementById('livros-padrao-input');
+    const padrao = padraoInput ? padraoInput.value.trim() : '';
+    if (!padrao) {
+        toast('Digite um padrão para buscar', true);
+        return;
+    }
+
+    const algoSelect = document.getElementById('livros-algoritmo-select');
+    const algoritmo = algoSelect ? algoSelect.value : 'kmp';
+
+    const tbody = document.getElementById('livros-tbody');
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="9"><span class="spinner"></span>Buscando com ${algoritmo.toUpperCase()}...</td></tr>`;
+
+    try {
+        const url = `/api/buscar?padrao=${encodeURIComponent(padrao)}&algoritmo=${encodeURIComponent(algoritmo)}`;
+        const data = await apiFetch(url);
+        renderRows('livros', tbody, data);
+        toast(`Busca concluída: ${data.length} livro(s) encontrado(s) com ${algoritmo.toUpperCase()}`);
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⚠️</div><p>Erro na busca: ${e.message}</p></div></td></tr>`;
+        toast(e.message, true);
+    }
+}
+
+function limparBuscaTexto() {
+    const input = document.getElementById('livros-padrao-input');
+    if (input) input.value = '';
+    // Recarrega a lista completa
+    loadTable('livros');
+}
 
   loadDashboard();
 });

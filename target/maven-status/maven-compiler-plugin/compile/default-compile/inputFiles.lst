@@ -20,7 +20,10 @@ C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\model\LivroAutor.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\model\Tag.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\model\TagsLivros.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\model\Usuarios.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\search\BoyerMoore.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\search\KMP.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\server\ApiServer.java
+C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\service\BuscaService.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\service\UsuarioService.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\Arquivo.java
 C:\Users\campa\Documents\TP-AEDS-III-G9\src\main\java\src\util\ArvoreBMais.java

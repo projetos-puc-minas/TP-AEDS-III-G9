@@ -187,7 +187,56 @@
           </tbody>
         </table>
       </div>
+    </div><!-- ─── LIVROS ─── -->
+<div id="page-livros" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Livros</div>
+      <div class="page-subtitle">Catálogo de livros com suporte a ordenação via Árvore B+ e Intercalação Externa</div>
     </div>
+    <button class="btn btn-primary" onclick="openModal('livros')">＋ Novo Livro</button>
+  </div>
+  <div class="toolbar">
+    <!-- Busca por ID (Hash) -->
+    <div class="hash-search">
+      <span class="hash-icon">⚡</span>
+      <input type="number" id="livros-hash-input" placeholder="Buscar por ID…" min="1" onkeydown="if(event.key==='Enter') buscarPorHash('livros')">
+      <button class="btn btn-hash" onclick="buscarPorHash('livros')" title="Busca direta via Hash Extensível — O(1)">Hash</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadTable('livros')" title="Limpar busca">✕</button>
+    </div>
+
+    <!-- NOVO: Busca textual (KMP / BM) -->
+    <div class="text-search">
+      <input type="text" id="livros-padrao-input" placeholder="🔍 Digite o padrão (ex: harry)" onkeydown="if(event.key==='Enter') buscarTexto()">
+      <select id="livros-algoritmo-select">
+        <option value="kmp">KMP</option>
+        <option value="bm">Boyer-Moore</option>
+      </select>
+      <button class="btn btn-primary" onclick="buscarTexto()">Buscar</button>
+      <button class="btn btn-ghost btn-sm" onclick="limparBuscaTexto()" title="Limpar busca textual">✕</button>
+    </div>
+
+    <!-- Ordenação -->
+    <div class="order-toggle">
+      <button class="order-btn active" onclick="setOrder('livros','asc',this)" title="Crescente — Travessia Árvore B+ (3d-2)">↑ ID Asc</button>
+      <button class="order-btn" onclick="setOrder('livros','desc',this)" title="Decrescente — Travessia Árvore B+ (3d-2)">↓ ID Desc</button>
+      <button class="order-btn" onclick="loadNomeOrder('livros')" title="Por Título — Ordenação por Intercalação (3d-1)">Az Título</button>
+    </div>
+    <button class="btn btn-ghost" onclick="loadTable('livros')">↻</button>
+  </div>
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Título</th><th>Editora</th><th>ISBN</th><th>Ano</th><th>Preço</th><th>Autores</th><th>Tags</th><th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="livros-tbody">
+        <tr class="loading-row"><td colspan="9"><span class="spinner"></span>Aguardando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
     <!-- ─── AUTORES ─── -->
     <!-- Colunas: ID | Nome | Nascimento | Biografia | Livros | Ações -->

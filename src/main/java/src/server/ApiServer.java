@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import src.dao.*;
 import src.model.*;
+import src.service.BuscaService;
 import src.service.UsuarioService;
 import src.util.DataUtil;
 
@@ -42,6 +43,7 @@ public class ApiServer {
         server.createContext("/api/usuarios",       new UsuariosHandler());
         server.createContext("/api/tags",           new TagsHandler());
         server.createContext("/api/auth",           new AuthHandler());
+        server.createContext("/api/buscar",         new BuscarHandler()); // NOVO
         server.createContext("/",                   new StaticHandler(webRoot));
 
         server.setExecutor(Executors.newFixedThreadPool(8));
@@ -71,6 +73,62 @@ public class ApiServer {
             ex.getResponseHeaders().set("Content-Type", ct);
             ex.sendResponseHeaders(200, body.length);
             try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+        }
+    }
+
+    // --- HANDLER: BUSCAR (NOVO) ---
+    private class BuscarHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            if (handleCors(ex)) return;
+            try {
+                String method = ex.getRequestMethod();
+                if (!"GET".equals(method)) {
+                    sendJson(ex, 405, "{\"erro\":\"Method not allowed\"}");
+                    return;
+                }
+
+                String query = ex.getRequestURI().getQuery();
+                if (query == null || query.isEmpty()) {
+                    sendJson(ex, 400, "{\"erro\":\"Parâmetros ausentes: padrao e algoritmo são obrigatórios\"}");
+                    return;
+                }
+
+                // Parse dos parâmetros
+                String[] params = query.split("&");
+                String padrao = null;
+                String algoritmo = "kmp"; // padrão
+
+                for (String p : params) {
+                    if (p.startsWith("padrao=")) {
+                        padrao = java.net.URLDecoder.decode(p.substring(7), "UTF-8");
+                    } else if (p.startsWith("algoritmo=")) {
+                        algoritmo = java.net.URLDecoder.decode(p.substring(10), "UTF-8");
+                    }
+                }
+
+                if (padrao == null || padrao.trim().isEmpty()) {
+                    sendJson(ex, 400, "{\"erro\":\"Parâmetro 'padrao' é obrigatório\"}");
+                    return;
+                }
+
+                // Instancia o serviço de busca
+                BuscaService buscaService = new BuscaService(factory.getLivroDAO());
+
+                // Realiza a busca nos livros (título)
+                List<Livro> resultados = buscaService.buscarLivrosPorTitulo(padrao, algoritmo);
+
+                // Converte para JSON usando o método auxiliar
+                JSONArray arr = new JSONArray();
+                for (Livro l : resultados) {
+                    arr.put(livroToJson(l));
+                }
+
+                sendJson(ex, 200, arr.toString());
+
+            } catch (Exception e) {
+                sendError(ex, e);
+            }
         }
     }
 
@@ -140,52 +198,9 @@ public class ApiServer {
                 }
             } catch (Exception e) { sendError(ex, e); }
         }
-
-        private JSONObject livroToJson(Livro l) {
-            String nomeEditora = "Editora #" + l.getIdEditora();
-            try {
-                Editora ed = factory.getEditoraDAO().buscarEditora(l.getIdEditora());
-                if (ed != null) nomeEditora = ed.getNome();
-            } catch (Exception ignored) {}
-
-            JSONArray autoresArr = new JSONArray();
-            try {
-                List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarAutoresDoLivro(l.getId());
-                for (LivroAutor la : vinculos) {
-                    Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
-                    if (a != null) {
-                        autoresArr.put(new JSONObject().put("id", a.getId()).put("nome", a.getNome()));
-                    }
-                }
-            } catch (Exception ignored) {}
-
-            JSONArray tagsArr = new JSONArray();
-            try {
-                List<TagsLivros> vinculos = factory.getTagsLivrosDAO().buscarTagsDoLivro(l.getId());
-                for (TagsLivros tl : vinculos) {
-                    Tag t = factory.getTagDAO().buscarTag(tl.getIdTag());
-                    if (t != null) {
-                        tagsArr.put(new JSONObject().put("id", t.getId()).put("nome", t.getNome()));
-                    }
-                }
-            } catch (Exception ignored) {}
-
-            return new JSONObject()
-                .put("id",            l.getId())
-                .put("idEditora",     l.getIdEditora())
-                .put("nomeEditora",   nomeEditora)
-                .put("titulo",        l.getTitulo())
-                .put("isbn",          new String(l.getIsbn()).trim())
-                .put("anoPublicacao", l.getAnoPublicacao())
-                .put("preco",         l.getPreco())
-                .put("sinopse",       l.getSinopse() != null ? l.getSinopse() : "")
-                .put("autores",       autoresArr)
-                .put("tags",          tagsArr);
-        }
     }
 
     // --- HANDLER: AUTORES ---
-    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarAutor(id)
     private class AutoresHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -197,7 +212,6 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     if (id > 0) {
-                        // Busca direta via Hash Extensível — O(1) amortizado
                         Autores a = dao.buscarAutor(id);
                         if (a == null) { send404(ex); return; }
                         sendJson(ex, 200, autorToJson(a).toString());
@@ -256,7 +270,6 @@ public class ApiServer {
     }
 
     // --- HANDLER: EDITORAS ---
-    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarEditora(id)
     private class EditorasHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -268,7 +281,6 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     if (id > 0) {
-                        // Busca direta via Hash Extensível — O(1) amortizado
                         Editora e = dao.buscarEditora(id);
                         if (e == null) { send404(ex); return; }
                         sendJson(ex, 200, new JSONObject()
@@ -315,7 +327,6 @@ public class ApiServer {
     }
 
     // --- HANDLER: USUARIOS ---
-    // CORRIGIDO: GET por ID agora usa hash.buscar(id) via dao.buscarUsuario(id)
     private class UsuariosHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange ex) throws IOException {
@@ -328,7 +339,6 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     if (id > 0) {
-                        // Busca direta via Hash Extensível — O(1) amortizado
                         Usuarios u = dao.buscarUsuario(id);
                         if (u == null) { send404(ex); return; }
                         sendJson(ex, 200, usuarioToJson(u).toString());
@@ -404,7 +414,6 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     if (id > 0) {
-                        // Busca direta via Hash Extensível — O(1) amortizado
                         LivroAutor la = dao.buscarPorId(id);
                         if (la == null) { send404(ex); return; }
                         String nomeLivro = "Livro #" + la.getIdLivro();
@@ -473,7 +482,6 @@ public class ApiServer {
 
                 if ("GET".equals(method)) {
                     if (id > 0) {
-                        // Busca direta via Hash Extensível — O(1) amortizado
                         TagsLivros tl = dao.buscarPorId(id);
                         if (tl == null) { send404(ex); return; }
                         String nomeTag   = "Tag #"   + tl.getIdTag();
@@ -627,7 +635,7 @@ public class ApiServer {
         }
     }
 
-    // --- AUXILIARES ---
+    // --- MÉTODOS AUXILIARES ---
 
     private static int extractId(HttpExchange ex) {
         String[] parts = ex.getRequestURI().getPath().split("/");
@@ -680,5 +688,48 @@ public class ApiServer {
         String[] r = new String[a.length()];
         for (int i = 0; i < a.length(); i++) r[i] = a.getString(i);
         return r;
+    }
+
+    // --- Método auxiliar para serializar Livro em JSON (reutilizado) ---
+    private JSONObject livroToJson(Livro l) {
+        String nomeEditora = "Editora #" + l.getIdEditora();
+        try {
+            Editora ed = factory.getEditoraDAO().buscarEditora(l.getIdEditora());
+            if (ed != null) nomeEditora = ed.getNome();
+        } catch (Exception ignored) {}
+
+        JSONArray autoresArr = new JSONArray();
+        try {
+            List<LivroAutor> vinculos = factory.getLivroAutorDAO().buscarAutoresDoLivro(l.getId());
+            for (LivroAutor la : vinculos) {
+                Autores a = factory.getAutoresDAO().buscarAutor(la.getIdAutor());
+                if (a != null) {
+                    autoresArr.put(new JSONObject().put("id", a.getId()).put("nome", a.getNome()));
+                }
+            }
+        } catch (Exception ignored) {}
+
+        JSONArray tagsArr = new JSONArray();
+        try {
+            List<TagsLivros> vinculos = factory.getTagsLivrosDAO().buscarTagsDoLivro(l.getId());
+            for (TagsLivros tl : vinculos) {
+                Tag t = factory.getTagDAO().buscarTag(tl.getIdTag());
+                if (t != null) {
+                    tagsArr.put(new JSONObject().put("id", t.getId()).put("nome", t.getNome()));
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return new JSONObject()
+            .put("id",            l.getId())
+            .put("idEditora",     l.getIdEditora())
+            .put("nomeEditora",   nomeEditora)
+            .put("titulo",        l.getTitulo())
+            .put("isbn",          new String(l.getIsbn()).trim())
+            .put("anoPublicacao", l.getAnoPublicacao())
+            .put("preco",         l.getPreco())
+            .put("sinopse",       l.getSinopse() != null ? l.getSinopse() : "")
+            .put("autores",       autoresArr)
+            .put("tags",          tagsArr);
     }
 }
